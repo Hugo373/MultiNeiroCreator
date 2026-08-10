@@ -51,6 +51,12 @@ def verify_and_consume_code(email: str, code: str) -> None:
 
 
 async def send_code(username: str) -> dict:
+    if not MAIL_USER or not MAIL_PASS:
+        raise HTTPException(
+            status_code=503,
+            detail="邮件服务未配置，请联系管理员（MAIL_USER / MAIL_PASS 未设置）",
+        )
+
     code = store_code(username)
 
     msg = MIMEText(
@@ -69,6 +75,9 @@ async def send_code(username: str) -> dict:
     msg["From"] = MAIL_USER
     msg["To"] = username
 
+    # 465 端口是隐式 TLS（连接即握手），587 端口是明文连接后 STARTTLS 升级，
+    # 两者不能混用，否则报 SSL: WRONG_VERSION_NUMBER
+    implicit_tls = MAIL_PORT == 465
     try:
         await aiosmtplib.send(
             msg,
@@ -76,7 +85,8 @@ async def send_code(username: str) -> dict:
             port=MAIL_PORT,
             username=MAIL_USER,
             password=MAIL_PASS,
-            use_tls=True,
+            use_tls=implicit_tls,
+            start_tls=not implicit_tls,
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"邮件发送失败: {str(exc)}") from exc

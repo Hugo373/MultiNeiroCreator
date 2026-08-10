@@ -10,10 +10,24 @@ load_dotenv(BACKEND_DIR / ".env")
 
 DB_FILE = BACKEND_DIR / "data" / "conversations.db"
 
+# ===== 运行环境 =====
+# development / production：控制 API 文档开关等环境差异（main.py 使用）
+APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
+IS_PRODUCTION = APP_ENV == "production"
+
+# CORS 白名单：逗号分隔的完整 Origin（协议+域名+端口），默认只放行本地开发地址。
+# 开发环境前端经 Vite 代理（/api）访问后端，本身是同源请求；白名单管的是不走代理的直连场景。
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+    if origin.strip()
+]
+
 MAIL_USER = os.getenv("MAIL_USER", "")
 MAIL_PASS = os.getenv("MAIL_PASS", "")
-MAIL_HOST = os.getenv("MAIL_HOST", "smtp.gmail.com")
-MAIL_PORT = int(os.getenv("MAIL_PORT", "587"))
+MAIL_HOST = os.getenv("MAIL_HOST", "smtp.qq.com")
+# 465 = 隐式 TLS，587 = STARTTLS，auth_service 按端口自动选择握手方式
+MAIL_PORT = int(os.getenv("MAIL_PORT", "465"))
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
@@ -38,3 +52,16 @@ CODE_SEND_PER_EMAIL_PER_DAY = int(os.getenv("CODE_SEND_PER_EMAIL_PER_DAY", "10")
 CODE_SEND_PER_IP_PER_DAY = int(os.getenv("CODE_SEND_PER_IP_PER_DAY", "20"))
 UPLOAD_MAX_FILE_MB = int(os.getenv("UPLOAD_MAX_FILE_MB", "30"))
 UPLOAD_DAILY_TOTAL_MB = int(os.getenv("UPLOAD_DAILY_TOTAL_MB", "100"))
+
+# ===== 请求体大小限制（core/bodylimit.py 使用）=====
+# 全局上限要大于上传单文件上限（30MB + multipart 编码开销），否则合法上传会被中间件先拦掉
+BODY_MAX_MB = int(os.getenv("BODY_MAX_MB", "32"))
+
+# ===== 聊天/资料字段级上限 =====
+# 全局字节上限管的是"传输层"，这里管的是"业务层"：1MB 的 body 过得了全局限制，
+# 但作为单条聊天消息仍然不合理。历史条数上限用于服务端重建上下文时的粗粒度兜底（A5），
+# 按 token 精确截断是 G3 的事。
+CHAT_MESSAGE_MAX_CHARS = int(os.getenv("CHAT_MESSAGE_MAX_CHARS", "20000"))
+CHAT_HISTORY_MAX_ITEMS = int(os.getenv("CHAT_HISTORY_MAX_ITEMS", "200"))
+CHAT_ATTACHMENTS_MAX_ITEMS = int(os.getenv("CHAT_ATTACHMENTS_MAX_ITEMS", "20"))
+PROFILE_MAX_CHARS = int(os.getenv("PROFILE_MAX_CHARS", "5000"))
