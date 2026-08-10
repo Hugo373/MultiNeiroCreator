@@ -1,10 +1,6 @@
 # ===== 机密配置文件 =====
 .env
 *.env
-secret_key.txt
-user_profile.json
-nginx_reviagent.conf
-cert/
 start.sh
 
 # ===== Python 虚拟环境与缓存 =====
@@ -12,6 +8,7 @@ venv/
 .venv/
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # ===== 向量数据库 / 本地数据 / 日志 =====
 chroma_db/
@@ -19,7 +16,8 @@ data/
 *.db
 *.rdb
 *.log
-.vscode/
+
+# ===== 项目内部文档（不进仓库）=====
 architecture.md
 git_push.md
 assessment.md
@@ -28,19 +26,16 @@ solved.md
 CLAUDE.md
 unsolved.md
 
+# ===== 编辑器与工具目录 =====
+.vscode/
+.claude/
+
 # ===== 备份与临时文件 =====
 *.bak
-
-
 
 # ===== 前端依赖与构建产物 =====
 node_modules/
 dist/
-workspace/
-.trae/
-.claude/
-frontend/MultiNeiroCreator/
-garden-skills/
 
 # ===== 操作系统垃圾文件 =====
 .DS_Store
