@@ -15,7 +15,11 @@
         </div>
 
         <div class="nav-actions">
-          <a class="nav-link-button" @click="openAuthEntry">Sign in</a>
+          <a v-if="!userStore.isLoggedIn" class="nav-link-button" @click="openAuthEntry">Sign in</a>
+          <template v-else>
+            <a class="nav-link-button" @click="openAuthEntry">Open Workstation</a>
+            <a class="nav-link-button" @click="handleSignOut">Sign out</a>
+          </template>
           <button class="nav-menu-button" type="button">Menu</button>
         </div>
 
@@ -37,6 +41,7 @@
           <a href="#workflow" @click="menuOpen = false">Workflow</a>
           <a href="#about" @click="menuOpen = false">About</a>
           <a class="nav-mobile-link" @click="openAuthEntry">Open Workstation</a>
+          <a v-if="userStore.isLoggedIn" class="nav-mobile-link" @click="handleSignOut">Sign out</a>
         </div>
       </Transition>
     </header>
@@ -167,6 +172,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { useLoadingStore } from '@/stores/loading'
 import { TOKEN_KEY } from '@/constants'
@@ -187,6 +193,12 @@ function openAuthEntry() {
     return
   }
   router.push('/login')
+}
+
+function handleSignOut() {
+  userStore.logout()
+  menuOpen.value = false
+  ElMessage.success('已退出登录')
 }
 
 const sideFilters = ['Composer', 'Lyrics', 'Visual', 'Video', 'Workflow']
