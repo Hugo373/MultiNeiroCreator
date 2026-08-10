@@ -114,6 +114,9 @@
                   </div>
                 </Transition>
               </div>
+              <button class="status-button" type="button" title="退出登录" @click="handleLogout">
+                <span class="status-button-label">退出登录</span>
+              </button>
             </div>
             <div class="window-controls" aria-hidden="true">
               <div class="window-dot"></div>
@@ -552,7 +555,9 @@ import {
   type AgentHistoryItem,
 } from '@/serve/agent'
 import { createProject, getRecentProjects, type ProjectPayload } from '@/serve/project'
+import { createTypewriter } from '@/utils/typewriter'
 import { useLoadingStore } from '@/stores/loading'
+import { useUserStore } from '@/stores/user'
 
 // 真实进度接管：让工作站初始化阶段能推动 loadingStore.setProgress()，
 // 覆盖层在 realProgress > 0 时无缝从内置 rAF 切到真实进度。
@@ -1571,19 +1576,10 @@ function toggleSaveMode() {
   isSaveModeOpen.value = !isSaveModeOpen.value
 }
 
-function buildAgentHistory(): AgentHistoryItem[] {
-  return agentMessages.value
-    .filter(item => !item.isError)
-    .map(item => ({
-      role: item.role,
-      content: item.content,
-      attachments: item.attachments?.map(attachment => ({
-        name: attachment.name,
-        kind: attachment.kind,
-        badge: attachment.badge,
-        meta: attachment.meta,
-      })),
-    }))
+function handleLogout() {
+  useUserStore().logout()
+  ElMessage.success('已退出登录')
+  router.push('/login')
 }
 
 function hydrateAttachmentFromPayload(payload: AgentAttachmentItem): UploadedAttachment {
@@ -1753,14 +1749,13 @@ async function sendAgentMessage() {
     isUploadingAttachment.value = false
   }
 
-  const history = buildAgentHistory()
   const userMessage: AgentMessage = {
     id: `agent-${localAgentMessageId++}`,
     role: 'user',
     content: message || '已发送附件',
     attachments: pendingAttachments.map(cloneAttachmentForMessage),
   }
-  const assistantMessage: AgentMessage = {
+  const assistantMessageSeed: AgentMessage = {
     id: `agent-${localAgentMessageId++}`,
     role: 'assistant',
     content: '',
@@ -1768,7 +1763,17 @@ async function sendAgentMessage() {
     isPending: true,
   }
 
-  agentMessages.value = [...agentMessages.value, userMessage, assistantMessage]
+  agentMessages.value = [...agentMessages.value, userMessage, assistantMessageSeed]
+  // 流式回调必须改数组里的响应式代理对象；直接改 seed 原始对象绕过 Vue 响应式，界面不会逐 token 刷新
+  const assistantMessage = agentMessages.value[agentMessages.value.length - 1]
+  // token 是一簇一簇到达的，经打字机缓冲后按帧匀速上屏，消除跳字感
+  const typewriter = createTypewriter(text => {
+    if (assistantMessage.isPending) {
+      assistantMessage.isPending = false
+    }
+    assistantMessage.content += text
+    void scrollAssistantToBottom()
+  })
   agentInput.value = ''
   clearUploadedAttachments()
   isAgentSending.value = true
@@ -1786,7 +1791,6 @@ async function sendAgentMessage() {
     await streamAgentChat(
       {
         message,
-        history,
         project_id: currentProjectId.value,
         attachments: attachmentPayloads,
       },
@@ -1805,16 +1809,14 @@ async function sendAgentMessage() {
             window.clearTimeout(agentFirstTokenTimeout)
             agentFirstTokenTimeout = null
           }
-          if (assistantMessage.isPending) {
-            assistantMessage.isPending = false
-          }
           if (!hasAgentStartedReplying.value) {
             markAgentReplyStarted()
           }
-          assistantMessage.content += event.content
-          void scrollAssistantToBottom()
+          typewriter.push(event.content)
         },
-        onDone(event) {
+        async onDone(event) {
+          // 等缓冲吐完再用服务端历史整体替换消息列表，避免文字瞬间跳到全量
+          await typewriter.finish()
           activeToolName.value = ''
           agentMessages.value = mapHistoryToAgentMessages(event.history)
           void scrollAssistantToBottom()
@@ -1823,6 +1825,7 @@ async function sendAgentMessage() {
       chatAbortController.signal,
     )
   } catch (error) {
+    typewriter.cancel()
     if (isFirstTokenTimeoutError(error)) {
       assistantMessage.isPending = false
       assistantMessage.content = '10 秒内未收到模型返回，已自动暂停本次响应。请检查后端日志、接口耗时或重试。'

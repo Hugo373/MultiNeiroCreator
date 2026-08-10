@@ -17,7 +17,7 @@ export interface AgentHistoryItem {
 
 export interface AgentChatPayload {
   message: string
-  history: AgentHistoryItem[]
+  // 不再发送 history：对话历史以服务端数据库为唯一真源（A5），由后端按 project_id 重建
   project_id?: number | null
   attachments?: AgentAttachmentItem[]
 }
