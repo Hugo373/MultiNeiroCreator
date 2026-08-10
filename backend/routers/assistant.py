@@ -22,9 +22,8 @@ router = APIRouter(tags=["assistant"])
 
 @router.post("/chat")
 async def chat(req: ChatRequest, user=Depends(chat_rate_limit)):
-    history = [item.model_dump() for item in req.history]
     return StreamingResponse(
-        stream_chat(user, req.message, history, req.project_id, [item.model_dump() for item in req.attachments]),
+        stream_chat(user, req.message, req.project_id, [item.model_dump() for item in req.attachments]),
         media_type="text/event-stream",
     )
 

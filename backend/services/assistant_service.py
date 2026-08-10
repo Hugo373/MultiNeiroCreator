@@ -5,8 +5,10 @@ import tempfile
 from typing import AsyncGenerator
 
 from fastapi import HTTPException, UploadFile
+from starlette.concurrency import iterate_in_threadpool
 
 from agents.neyria import build_system_prompt, client, tools_map, tools_schema
+from core import config
 from repositories.chat_repo import append_message, clear_history as repo_clear_history, list_history
 from repositories.user_repo import get_profile, update_profile
 from services.rag import add_document, delete_document, get_document_chunks, list_documents, reindex_document, replace_document, search
@@ -175,7 +177,6 @@ def build_retrieved_context(
 async def stream_chat(
     user: dict,
     message: str,
-    history: list[dict],
     project_id: int | None = None,
     attachments: list[dict] | None = None,
 ) -> AsyncGenerator[str, None]:
@@ -196,6 +197,10 @@ async def stream_chat(
 
     profile = load_profile(user["id"])
     system_prompt = build_system_prompt(profile, context)
+
+    # 对话历史以服务端数据库为唯一真源，不信任客户端传来的内容（防伪造上下文注入）。
+    # 条数上限先做粗粒度兜底，按 token 精确截断是 G3 的事。
+    history = list_history(user["id"], project_id)[-config.CHAT_HISTORY_MAX_ITEMS:]
 
     messages = [{"role": "system", "content": system_prompt}]
     clean_history: list[dict] = []
@@ -242,7 +247,9 @@ async def stream_chat(
     tool_call_id = ""
     func_args_raw = ""
 
-    for chunk in first_stream:
+    # 上游流必须在线程池里迭代：同步 for 会阻塞事件循环，uvloop 下已 write 的
+    # 字节要等循环空闲才刷出 socket，SSE 会退化成"生成完一次性吐出"（连响应头都被扣住）
+    async for chunk in iterate_in_threadpool(first_stream):
         if not chunk.choices:
             continue
         delta = chunk.choices[0].delta
@@ -291,7 +298,7 @@ async def stream_chat(
             messages=messages,
             stream=True,
         )
-        for chunk in final_stream:
+        async for chunk in iterate_in_threadpool(final_stream):
             content = extract_stream_content(chunk)
             if content:
                 reply += content
