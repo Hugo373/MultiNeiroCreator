@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from '@/utils/toast'
 import { TOKEN_KEY } from '@/constants'
 import { isTokenExpired } from '@/utils/jwt'
 import { useUserStore } from '@/stores/user'

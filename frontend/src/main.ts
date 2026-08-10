@@ -1,21 +1,15 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import ElementPlus from 'element-plus'
-import 'element-plus/dist/index.css'
-import * as ElIcons from '@element-plus/icons-vue'
 import router from '@/router'
 import App from './App.vue'
 import './style.css'
 import { vRipple } from '@/directives/ripple'
 
+// Element Plus 不再全量引入（D4）：全库唯一用途是 ElMessage，
+// 由 @/utils/toast 按需引入组件与样式；图标库无任何使用，注册已删除。
 const app = createApp(App)
-
-Object.entries(ElIcons).forEach(([name, component]) => {
-  app.component(name, component)
-})
 
 app.use(createPinia())
 app.use(router)
-app.use(ElementPlus)
 app.directive('ripple', vRipple)
 app.mount('#app')

@@ -1,0 +1,446 @@
+/**
+ * 工作站共享样式基元（D1 拆分配套）。
+ * scoped 样式无法作用到子组件内部元素，因此把跨组件复用的原子样式集中在此：
+ * 全部选择器都锚定在 .workstation-layout 之下，不会泄漏到其他页面。
+ * 包含：CSS 变量、重置、按钮基础、果冻交互动效、面板/弹窗过渡、modal 与警示框基元。
+ */
+
+.workstation-layout {
+  --body-bg: #0b0b0b;
+  --column-bg: #101010;
+  --panel-bg: #101010;
+  --hover-bg: #1a1a1a;
+  --line: #262626;
+  --text-primary: #e6e6e6;
+  --text-secondary: #808080;
+  --text-sidebar: #a0a0a0;
+  --accent: #8a8a8a;
+  --topbar-h: 56px;
+  --app-min-width: 1420px;
+  --app-min-height: 820px;
+  --left-column-w: 312px;
+  --right-column-w: 392px;
+  width: 100vw;
+  height: 100vh;
+  overflow: auto;
+  background: var(--body-bg);
+  color: var(--text-primary);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.workstation-layout,
+.workstation-layout *,
+.workstation-layout *::before,
+.workstation-layout *::after {
+  box-sizing: border-box;
+  box-shadow: none !important;
+}
+
+.workstation-layout button,
+.workstation-layout input,
+.workstation-layout textarea {
+  font: inherit;
+}
+
+.workstation-layout button:not(.status-button):not(.add-tool-large) {
+  border: 0 !important;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.workstation-layout button:not(.status-button):not(.add-tool-large):hover {
+  background: var(--hover-bg);
+  color: #ffffff;
+  filter: brightness(1.1);
+}
+
+.workstation-layout .app-title,
+.workstation-layout .section-title,
+.workstation-layout .assistant-title,
+.workstation-layout .modal-title,
+.workstation-layout .message-title {
+  font-weight: 600;
+}
+
+.workstation-layout .window-controls {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.workstation-layout .window-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+/* ---------- 果冻交互动效（跨组件按钮通用） ---------- */
+
+.workstation-layout .combined-left,
+.workstation-layout .combined-right,
+.workstation-layout .status-button,
+.workstation-layout .project-switcher-option,
+.workstation-layout .search-result-item,
+.workstation-layout .status-panel-option,
+.workstation-layout .icon-button,
+.workstation-layout .add-tool-large,
+.workstation-layout .composer-tool,
+.workstation-layout .composer-model-button,
+.workstation-layout .composer-action,
+.workstation-layout .modal-option,
+.workstation-layout .modal-close {
+  will-change: transform, background-color, opacity;
+  transform-origin: center;
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 180ms ease,
+    color 180ms ease,
+    filter 180ms ease,
+    opacity 180ms ease;
+}
+
+.workstation-layout .combined-right:hover,
+.workstation-layout .status-button:hover,
+.workstation-layout .project-switcher-option:hover,
+.workstation-layout .search-result-item:hover,
+.workstation-layout .status-panel-option:hover,
+.workstation-layout .icon-button:hover,
+.workstation-layout .add-tool-large:hover,
+.workstation-layout .composer-tool:hover,
+.workstation-layout .composer-model-button:hover,
+.workstation-layout .composer-action:hover,
+.workstation-layout .modal-option:hover,
+.workstation-layout .modal-close:hover {
+  animation: ux-jelly 360ms cubic-bezier(0.22, 1, 0.36, 1) 1;
+  transform: translateY(-1px) scale(1.018);
+}
+
+.workstation-layout .combined-right:active,
+.workstation-layout .status-button:active,
+.workstation-layout .project-switcher-option:active,
+.workstation-layout .search-result-item:active,
+.workstation-layout .status-panel-option:active,
+.workstation-layout .icon-button:active,
+.workstation-layout .add-tool-large:active,
+.workstation-layout .composer-tool:active,
+.workstation-layout .composer-model-button:active,
+.workstation-layout .composer-action:active,
+.workstation-layout .modal-option:active,
+.workstation-layout .modal-close:active {
+  transform: scale(0.985);
+  transition-duration: 90ms;
+}
+
+@keyframes ux-jelly {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(-1px) scale(1.028, 0.984);
+  }
+  72% {
+    transform: translateY(-1px) scale(0.996, 1.012);
+  }
+  100% {
+    transform: translateY(-1px) scale(1.018);
+  }
+}
+
+/* ---------- 浮层 / 弹窗过渡（Transition 类名跨组件复用） ---------- */
+
+.workstation-layout .panel-float-enter-active,
+.workstation-layout .panel-float-leave-active {
+  transition:
+    opacity 320ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 320ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.workstation-layout .panel-float-enter-from,
+.workstation-layout .panel-float-leave-to {
+  opacity: 0;
+  transform: translateY(-12px) scale(0.985);
+  filter: blur(6px);
+}
+
+.workstation-layout .panel-float-enter-to,
+.workstation-layout .panel-float-leave-from {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+}
+
+.workstation-layout .modal-fade-enter-active,
+.workstation-layout .modal-fade-leave-active {
+  transition: opacity 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.workstation-layout .modal-fade-enter-from,
+.workstation-layout .modal-fade-leave-to {
+  opacity: 0;
+}
+
+.workstation-layout .modal-fade-enter-to,
+.workstation-layout .modal-fade-leave-from {
+  opacity: 1;
+}
+
+.workstation-layout .modal-fade-enter-active .modal-card,
+.workstation-layout .modal-fade-leave-active .modal-card {
+  transition:
+    opacity 320ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 320ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.workstation-layout .modal-fade-enter-from .modal-card,
+.workstation-layout .modal-fade-leave-to .modal-card {
+  opacity: 0;
+  transform: translateY(-14px) scale(0.985);
+  filter: blur(8px);
+}
+
+.workstation-layout .modal-fade-enter-to .modal-card,
+.workstation-layout .modal-fade-leave-from .modal-card {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+}
+
+.workstation-layout .modal-swap-enter-active,
+.workstation-layout .modal-swap-leave-active {
+  transition:
+    opacity 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.workstation-layout .modal-swap-enter-from,
+.workstation-layout .modal-swap-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+  filter: blur(4px);
+}
+
+.workstation-layout .modal-swap-enter-to,
+.workstation-layout .modal-swap-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+
+/* ---------- Modal 基元 ---------- */
+
+.workstation-layout .modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(8px);
+  z-index: 20;
+}
+
+.workstation-layout .modal-card {
+  width: min(540px, 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(16, 16, 16, 0.96);
+  overflow: hidden;
+}
+
+.workstation-layout .modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  background: transparent;
+}
+
+.workstation-layout .modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.workstation-layout .modal-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: transparent;
+}
+
+.workstation-layout .modal-option {
+  width: 100%;
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+  border-radius: 16px;
+  background: transparent;
+  padding: 12px 14px;
+}
+
+.workstation-layout .modal-option-sub {
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.workstation-layout .project-create-modal,
+.workstation-layout .project-confirm-modal,
+.workstation-layout .project-warning-modal {
+  width: min(520px, 100%);
+}
+
+.workstation-layout .project-confirm-modal {
+  border-color: rgba(173, 72, 72, 0.26);
+}
+
+.workstation-layout .project-create-body {
+  gap: 16px;
+}
+
+.workstation-layout .project-create-label {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.workstation-layout .project-create-input {
+  width: 100%;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-primary);
+  padding: 0 12px;
+  outline: none;
+}
+
+.workstation-layout .project-create-input:focus {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.workstation-layout .project-create-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workstation-layout .project-summary-title {
+  color: var(--text-primary);
+}
+
+.workstation-layout .project-summary-meta {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.workstation-layout .project-create-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.workstation-layout .project-create-actions--three {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.workstation-layout .project-warning-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.workstation-layout .project-secondary-button,
+.workstation-layout .project-primary-button,
+.workstation-layout .project-danger-button {
+  height: 38px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 180ms ease,
+    color 180ms ease,
+    opacity 180ms ease;
+}
+
+.workstation-layout .project-secondary-button {
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: var(--text-secondary) !important;
+}
+
+.workstation-layout .project-primary-button {
+  background: #f2f2f2 !important;
+  color: #0b0b0b !important;
+}
+
+.workstation-layout .project-danger-button {
+  background: #8f2d2d !important;
+  color: #f3dede !important;
+}
+
+.workstation-layout .project-secondary-button:hover,
+.workstation-layout .project-primary-button:hover,
+.workstation-layout .project-danger-button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+
+.workstation-layout .project-secondary-button:disabled,
+.workstation-layout .project-primary-button:disabled,
+.workstation-layout .project-danger-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.workstation-layout .warning-callout {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(173, 72, 72, 0.22);
+  background: rgba(143, 45, 45, 0.08);
+}
+
+.workstation-layout .warning-icon {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(143, 45, 45, 0.18);
+  color: #f3dede;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.workstation-layout .warning-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workstation-layout .warning-title {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.workstation-layout .warning-message {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}

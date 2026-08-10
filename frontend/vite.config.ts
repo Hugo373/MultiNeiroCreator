@@ -23,6 +23,21 @@ export default defineConfig({
       '@': resolve(__dirname, 'src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // 分包（D4）：框架运行时与业务代码分离，业务迭代不使 vendor 缓存失效；
+        // Vite 8 为 rolldown 内核，manualChunks 对象写法已废弃，改用 advancedChunks
+        advancedChunks: {
+          groups: [
+            { name: 'element-plus', test: /node_modules\/element-plus\// },
+            { name: 'axios', test: /node_modules\/(axios|form-data)\// },
+            { name: 'vue', test: /node_modules\/(vue|@vue|vue-router|pinia)\// },
+          ],
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       '/api': {

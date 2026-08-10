@@ -11,8 +11,14 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AssistantPanel: typeof import('./../components/assistant/AssistantPanel.vue')['default']
+    AttachmentDock: typeof import('./../components/assistant/AttachmentDock.vue')['default']
+    ChatComposer: typeof import('./../components/assistant/ChatComposer.vue')['default']
+    CreateProjectDialog: typeof import('./../components/project/CreateProjectDialog.vue')['default']
     LoadingOverlay: typeof import('./../components/LoadingOverlay.vue')['default']
+    MessageList: typeof import('./../components/assistant/MessageList.vue')['default']
     ParticleBackground: typeof import('./../components/ParticleBackground.vue')['default']
+    ProjectSwitcher: typeof import('./../components/project/ProjectSwitcher.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
   }

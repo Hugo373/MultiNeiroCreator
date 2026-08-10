@@ -172,7 +172,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from '@/utils/toast'
 import { useUserStore } from '@/stores/user'
 import { useLoadingStore } from '@/stores/loading'
 import { TOKEN_KEY } from '@/constants'
