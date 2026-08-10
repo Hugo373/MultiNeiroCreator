@@ -67,6 +67,38 @@ export interface AgentDoneEvent {
 
 type AgentStreamEvent = AgentToolEvent | AgentContentEvent | AgentDoneEvent
 
+interface AgentStreamHandlers {
+  onTool?: (event: AgentToolEvent) => void
+  onContent?: (event: AgentContentEvent) => void
+  onDone?: (event: AgentDoneEvent) => void
+}
+
+// 解析单个 SSE 块并分发事件。单行损坏（坏 JSON / 未知类型）只丢弃该行，
+// 绝不向上抛异常中断整个流（B4）：已收到的内容和后续 token 必须保住。
+function dispatchSseBlock(block: string, handlers: AgentStreamHandlers) {
+  const line = block
+    .split('\n')
+    .find(item => item.startsWith('data: '))
+
+  if (!line) return
+
+  const payloadText = line.slice(6).trim()
+  if (!payloadText) return
+
+  let event: AgentStreamEvent
+  try {
+    event = JSON.parse(payloadText) as AgentStreamEvent
+  } catch {
+    console.warn('[SSE] 丢弃无法解析的数据行:', payloadText.slice(0, 200))
+    return
+  }
+
+  if (event.type === 'tool') handlers.onTool?.(event)
+  else if (event.type === 'content') handlers.onContent?.(event)
+  else if (event.type === 'done') handlers.onDone?.(event)
+  else console.warn('[SSE] 忽略未知事件类型:', (event as { type?: string }).type)
+}
+
 export const getAgentHistory = (projectId?: number | null) => {
   const suffix = projectId != null ? `?project_id=${projectId}` : ''
   return request.get<any, AgentHistoryItem[]>(`/history${suffix}`)
@@ -74,11 +106,7 @@ export const getAgentHistory = (projectId?: number | null) => {
 
 export async function streamAgentChat(
   payload: AgentChatPayload,
-  handlers: {
-    onTool?: (event: AgentToolEvent) => void
-    onContent?: (event: AgentContentEvent) => void
-    onDone?: (event: AgentDoneEvent) => void
-  },
+  handlers: AgentStreamHandlers,
   signal?: AbortSignal,
 ) {
   const token = localStorage.getItem(TOKEN_KEY)
@@ -128,36 +156,11 @@ export async function streamAgentChat(
     buffer = blocks.pop() || ''
 
     for (const block of blocks) {
-      const line = block
-        .split('\n')
-        .find(item => item.startsWith('data: '))
-
-      if (!line) continue
-
-      const payloadText = line.slice(6).trim()
-      if (!payloadText) continue
-
-      const event = JSON.parse(payloadText) as AgentStreamEvent
-
-      if (event.type === 'tool') handlers.onTool?.(event)
-      if (event.type === 'content') handlers.onContent?.(event)
-      if (event.type === 'done') handlers.onDone?.(event)
+      dispatchSseBlock(block, handlers)
     }
   }
 
   if (!buffer.trim()) return
 
-  const line = buffer
-    .split('\n')
-    .find(item => item.startsWith('data: '))
-
-  if (!line) return
-
-  const payloadText = line.slice(6).trim()
-  if (!payloadText) return
-
-  const event = JSON.parse(payloadText) as AgentStreamEvent
-  if (event.type === 'tool') handlers.onTool?.(event)
-  if (event.type === 'content') handlers.onContent?.(event)
-  if (event.type === 'done') handlers.onDone?.(event)
+  dispatchSseBlock(buffer, handlers)
 }
