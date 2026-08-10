@@ -15,3 +15,6 @@ export const createProject = (name?: string, projectPath?: string) =>
 
 export const getRecentProjects = (limit = 8) =>
   request.get<any, { items: ProjectPayload[] }>(`/projects/recent?limit=${limit}`)
+
+export const getProject = (projectId: number) =>
+  request.get<any, { project: ProjectPayload }>(`/projects/${projectId}`)

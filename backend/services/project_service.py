@@ -46,18 +46,29 @@ def list_recent_projects(user_id: int, limit: int = 8) -> list[dict]:
     ).fetchall()
     conn.close()
 
-    return [
-        {
-            "id": row["id"],
-            "name": row["name"],
-            "project_path": row["project_path"],
-            "save_mode": row["save_mode"],
-            "created_at": row["created_at"],
-            "updated_at": row["updated_at"],
-            "last_opened_at": row["last_opened_at"],
-        }
-        for row in rows
-    ]
+    return [_row_to_project_payload(row) for row in rows]
+
+
+def get_project(user_id: int, project_id: int) -> dict | None:
+    init_projects_table()
+
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        """
+        SELECT id, name, project_path, save_mode, created_at, updated_at, last_opened_at
+        FROM projects
+        WHERE user_id=? AND id=?
+        LIMIT 1
+        """,
+        (user_id, project_id),
+    ).fetchone()
+    conn.close()
+
+    if row is None:
+        return None
+
+    return _row_to_project_payload(row)
 
 
 def create_project(user_id: int, name: Optional[str] = None, project_path: Optional[str] = None) -> dict:
@@ -96,6 +107,18 @@ def create_project(user_id: int, name: Optional[str] = None, project_path: Optio
         "created_at": timestamp,
         "updated_at": timestamp,
         "last_opened_at": timestamp,
+    }
+
+
+def _row_to_project_payload(row: sqlite3.Row) -> dict:
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "project_path": row["project_path"],
+        "save_mode": row["save_mode"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "last_opened_at": row["last_opened_at"],
     }
 
 
