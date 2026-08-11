@@ -1,7 +1,9 @@
 import asyncio
 import json
+import logging
 import os
 import tempfile
+import time
 from typing import AsyncGenerator
 
 from fastapi import HTTPException, UploadFile
@@ -18,6 +20,10 @@ MAX_ATTACHMENT_CONTEXT_CHARS = 12000
 MAX_RETRIEVED_CONTEXT_CHARS = 6000
 
 MAX_TOOL_ARG_LENGTH = 500
+
+CHAT_MODEL = "glm-4-flash"  # E4 会把模型名收进 config，先收敛到单一常量
+
+logger = logging.getLogger("assistant")
 
 
 def validate_tool_call(func_name: str, func_args: dict) -> str | None:
@@ -66,6 +72,10 @@ async def upload_document(file: UploadFile, user_id: int, project_id: int | None
         )
         return {"status": "success", "message": f"成功导入文档: {file.filename}（共分切成 {chunks_count} 块）"}
     except Exception as exc:
+        logger.error(
+            "文档导入失败", exc_info=True,
+            extra={"evt": "doc_import_error", "error_type": type(exc).__name__},
+        )
         return {"status": "error", "message": f"导入失败: {str(exc)}"}
     finally:
         if tmp_path and os.path.exists(tmp_path):
@@ -180,11 +190,43 @@ async def stream_chat(
     project_id: int | None = None,
     attachments: list[dict] | None = None,
 ) -> AsyncGenerator[str, None]:
+    """对话流外层：兼做流中断兜底。
+
+    SSE 响应头发出后全局异常 handler 就管不到了（无法再发 500），生成器里的
+    异常只会表现为前端断流。这里统一兼做：记结构化错误日志 + 向前端发一条
+    error 事件体面收尾（前端对未知类型静默忽略，兼容旧版本）。
+    """
+    started = time.perf_counter()
+    try:
+        async for event in _stream_chat_impl(user, message, project_id, attachments):
+            yield event
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(
+            "对话流中断: %s", type(exc).__name__, exc_info=True,
+            extra={
+                "evt": "chat_stream_error",
+                "error_type": type(exc).__name__,
+                "duration_ms": round((time.perf_counter() - started) * 1000, 1),
+            },
+        )
+        yield f"data: {json.dumps({'type': 'error', 'message': '服务器开小差了，请稍后重试'}, ensure_ascii=False)}\n\n"
+
+
+async def _stream_chat_impl(
+    user: dict,
+    message: str,
+    project_id: int | None = None,
+    attachments: list[dict] | None = None,
+) -> AsyncGenerator[str, None]:
     if client is None:
         raise HTTPException(status_code=503, detail="未配置 API_KEY，聊天功能暂不可用")
 
+    chat_started = time.perf_counter()
     display_message = (message or "").strip() or "已发送附件"
 
+    rag_started = time.perf_counter()
     try:
         attachment_context, retrieved_context = await asyncio.gather(
             asyncio.to_thread(build_attachment_context, user["id"], project_id, attachments),
@@ -192,7 +234,21 @@ async def stream_chat(
         )
         context_sections = [item for item in [attachment_context, retrieved_context] if item]
         context = "\n\n".join(context_sections)
-    except Exception:
+        logger.info(
+            "上下文构建完成",
+            extra={
+                "evt": "context_build",
+                "duration_ms": round((time.perf_counter() - rag_started) * 1000, 1),
+                "attachment_chars": len(attachment_context),
+                "retrieved_chars": len(retrieved_context),
+            },
+        )
+    except Exception as exc:
+        # 降级不降噪：RAG 挂了对话仍可用，但必须留痕，否则检索失效只会表现为“回答质量变差”
+        logger.warning(
+            "上下文构建失败，降级为无 RAG 上下文: %s", type(exc).__name__, exc_info=True,
+            extra={"evt": "context_build_error", "error_type": type(exc).__name__},
+        )
         context = ""
 
     profile = load_profile(user["id"])
@@ -236,9 +292,12 @@ async def stream_chat(
     func_name = None
     reply = ""
 
+    llm_started = time.perf_counter()
+    first_token_at: float | None = None
+
     first_stream = await asyncio.to_thread(
         client.chat.completions.create,
-        model="glm-4-flash",
+        model=CHAT_MODEL,
         messages=messages,
         tools=tools_schema,
         stream=True,
@@ -263,6 +322,8 @@ async def stream_chat(
             continue
         content = delta.content if getattr(delta, "content", None) else ""
         if content:
+            if first_token_at is None:
+                first_token_at = time.perf_counter()
             reply += content
             yield f"data: {json.dumps({'type': 'content', 'content': content}, ensure_ascii=False)}\n\n"
 
@@ -275,10 +336,38 @@ async def stream_chat(
             "工具参数解析失败" if func_args is None else validate_tool_call(func_name, func_args)
         )
         yield f"data: {json.dumps({'type': 'tool', 'tool_name': func_name}, ensure_ascii=False)}\n\n"
+        tool_started = time.perf_counter()
         if validation_error:
             result = f"工具调用被拒绝：{validation_error}"
+            logger.warning(
+                "工具调用被拒绝: %s", validation_error,
+                extra={"evt": "tool_rejected", "tool": func_name, "reason": validation_error},
+            )
         else:
-            result = tools_map[func_name].invoke(func_args)
+            try:
+                # 工具都是同步函数（如联网搜索可阻塞 5s+），必须丢线程池，
+                # 否则阻塞事件循环、拖死其他用户的 SSE（同 solved.md #18 的根因）
+                result = await asyncio.to_thread(tools_map[func_name].invoke, func_args)
+                logger.info(
+                    "工具调用完成",
+                    extra={
+                        "evt": "tool_call",
+                        "tool": func_name,
+                        "duration_ms": round((time.perf_counter() - tool_started) * 1000, 1),
+                        "result_chars": len(str(result)),
+                    },
+                )
+            except Exception as exc:
+                logger.error(
+                    "工具执行失败: %s", type(exc).__name__, exc_info=True,
+                    extra={
+                        "evt": "tool_error",
+                        "tool": func_name,
+                        "error_type": type(exc).__name__,
+                        "duration_ms": round((time.perf_counter() - tool_started) * 1000, 1),
+                    },
+                )
+                result = "工具执行失败，请换个方式提问或稍后重试。"
         messages.append(
             {
                 "role": "assistant",
@@ -294,13 +383,15 @@ async def stream_chat(
         messages.append({"role": "tool", "content": result, "tool_call_id": tool_call_id})
         final_stream = await asyncio.to_thread(
             client.chat.completions.create,
-            model="glm-4-flash",
+            model=CHAT_MODEL,
             messages=messages,
             stream=True,
         )
         async for chunk in iterate_in_threadpool(final_stream):
             content = extract_stream_content(chunk)
             if content:
+                if first_token_at is None:
+                    first_token_at = time.perf_counter()
                 reply += content
                 yield f"data: {json.dumps({'type': 'content', 'content': content}, ensure_ascii=False)}\n\n"
 
@@ -310,4 +401,19 @@ async def stream_chat(
     append_message(user["id"], "user", current_user_history_item["content"], project_id, normalized_attachments)
     append_message(user["id"], "assistant", reply, project_id)
     clean_history.append({"role": "assistant", "content": reply})
+    now = time.perf_counter()
+    logger.info(
+        "对话完成",
+        extra={
+            "evt": "chat_done",
+            "model": CHAT_MODEL,
+            "tool": func_name,
+            "history_items": len(clean_history),
+            "reply_chars": len(reply),
+            # TTFT 从首次请求 LLM 算起；若走了工具分支，包含工具耗时（用户体感口径）
+            "ttft_ms": round(((first_token_at or now) - llm_started) * 1000, 1),
+            "llm_ms": round((now - llm_started) * 1000, 1),
+            "total_ms": round((now - chat_started) * 1000, 1),
+        },
+    )
     yield f"data: {json.dumps({'type': 'done', 'history': clean_history, 'tool_used': func_name}, ensure_ascii=False)}\n\n"

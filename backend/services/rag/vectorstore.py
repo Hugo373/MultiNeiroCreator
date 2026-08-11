@@ -13,6 +13,7 @@ class VectorStore:
         try:
             return self.client_db.get_collection(name)
         except Exception:
+            # get-or-create 惯用法：chroma 各版本抛的异常类型不同，“不存在就创建”是预期分支，非吞错
             return self.client_db.create_collection(name)
 
     def _build_metadata_filter(

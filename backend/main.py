@@ -4,15 +4,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 
 from core.bodylimit import BodySizeLimitMiddleware
-from core.config import CORS_ORIGINS, IS_PRODUCTION, REDIS_URL
+from core.config import APP_ENV, CORS_ORIGINS, IS_PRODUCTION, REDIS_URL
 from core.database import init_db
+from core.exceptions import register_exception_handlers
+from core.logging_config import setup_logging
 from core.ratelimit import redis_client
+from core.request_context import RequestContextMiddleware
 from routers.assistant import router as assistant_router
 from routers.auth import router as auth_router
 from routers.projects import router as projects_router
 from services.project_service import init_projects_table
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+setup_logging()
+logger = logging.getLogger("main")
 
 # 生产环境关闭交互式 API 文档（/docs /redoc /openapi.json），减少攻击面
 app = FastAPI(
@@ -20,11 +24,19 @@ app = FastAPI(
     redoc_url=None if IS_PRODUCTION else "/redoc",
     openapi_url=None if IS_PRODUCTION else "/openapi.json",
 )
-# add_middleware 后添加的在外层：先加 body 限制、后加 CORS，让 413 响应也经过 CORS 拿到响应头
+# add_middleware 后添加的在外层，实际栈由外到内：CORS → request_context → body 限制。
+# CORS 最外让 413/500 也能拿到 CORS 头；request_context 包住 body 限制，使 413 也有 access log 和 X-Request-ID。
 app.add_middleware(BodySizeLimitMiddleware)
+app.add_middleware(RequestContextMiddleware)
 app.add_middleware(
-    CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"]
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["X-Request-ID"],  # 允许浏览器 JS 读取，前端报错时可展示给用户
 )
+
+register_exception_handlers(app)
 
 
 app.include_router(auth_router)
@@ -39,6 +51,7 @@ def health() -> dict:
 
 @app.on_event("startup")
 async def bootstrap() -> None:
+    logger.info("服务启动", extra={"evt": "startup", "env": APP_ENV})
     init_db()
     init_projects_table()
     try:

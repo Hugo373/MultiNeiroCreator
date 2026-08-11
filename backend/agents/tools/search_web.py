@@ -1,5 +1,9 @@
+import logging
+
 from ddgs import DDGS
 from langchain_core.tools import tool
+
+logger = logging.getLogger("tools.search_web")
 
 
 @tool
@@ -35,15 +39,22 @@ def search_web(query: str) -> str:
                 results = list(ddgs.text(query, max_results=5, timelimit="m"))
             if results:
                 return "\n".join([f"{item['title']}: {item['body']}" for item in results])
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            "联网搜索失败，尝试降级: %s", type(exc).__name__,
+            extra={"evt": "search_error", "error_type": type(exc).__name__, "is_news": is_news},
+        )
         if is_news:
             try:
                 with DDGS(timeout=5) as ddgs:
                     results = list(ddgs.text(f"{query} 最新新闻", max_results=5, timelimit="d"))
                 if results:
                     return "\n".join([f"{item['title']}: {item['body']}" for item in results])
-            except Exception:
-                pass
+            except Exception as retry_exc:
+                logger.warning(
+                    "搜索降级重试也失败: %s", type(retry_exc).__name__,
+                    extra={"evt": "search_retry_error", "error_type": type(retry_exc).__name__},
+                )
         return "搜索失败，网络连接超时，请稍后重试。"
 
     return "没有找到相关结果"

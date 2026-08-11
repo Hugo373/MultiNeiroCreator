@@ -1,3 +1,4 @@
+import logging
 import secrets
 import sqlite3
 
@@ -13,6 +14,8 @@ from repositories.user_repo import create_user, get_user_by_username
 
 CODE_TTL_SECONDS = 300
 CODE_MAX_ATTEMPTS = 5
+
+logger = logging.getLogger("auth")
 
 # 验证码存 Redis（替代原进程内 _codes dict，多 worker/重启后依然有效）。
 # 这里用同步客户端：register 是 sync 路由（bcrypt 在线程池里跑，不阻塞事件循环），
@@ -89,7 +92,12 @@ async def send_code(username: str) -> dict:
             start_tls=not implicit_tls,
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"邮件发送失败: {str(exc)}") from exc
+        # 完整错误只进日志：SMTP 异常文本可能含主机/账号等内部信息，不能回给客户端
+        logger.error(
+            "验证码邮件发送失败: %s", type(exc).__name__, exc_info=True,
+            extra={"evt": "mail_send_error", "error_type": type(exc).__name__},
+        )
+        raise HTTPException(status_code=500, detail="邮件发送失败，请稍后重试") from exc
 
     return {"status": "ok", "message": "验证码已发送"}
 

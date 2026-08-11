@@ -1,7 +1,10 @@
 from datetime import datetime
+import logging
 
 import pytz
 from langchain_core.tools import tool
+
+logger = logging.getLogger("tools.current_time")
 
 
 @tool
@@ -26,4 +29,8 @@ def get_current_time() -> str:
 
         return "\n".join(result_lines)
     except Exception as exc:
+        logger.warning(
+            "获取全球时间失败: %s", type(exc).__name__, exc_info=True,
+            extra={"evt": "tool_time_error", "error_type": type(exc).__name__},
+        )
         return f"获取全球时间失败: {str(exc)}"

@@ -6,6 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
 from core.config import ACCESS_TOKEN_EXPIRE_DAYS, ALGORITHM, SECRET_KEY
+from core.logging_config import user_id_var
 
 
 bearer_scheme = HTTPBearer()
@@ -32,6 +33,9 @@ def create_token(user_id: int, username: str) -> str:
 def decode_token(credentials: HTTPAuthorizationCredentials) -> dict:
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        return {"id": int(payload.get("sub")), "username": payload.get("username")}
+        user_id = int(payload.get("sub"))
+        # 鉴权唯一入口：在这里把 user_id 写进请求作域域 ContextVar，本请求后续所有日志自动携带
+        user_id_var.set(str(user_id))
+        return {"id": user_id, "username": payload.get("username")}
     except JWTError as exc:
         raise HTTPException(status_code=401, detail="token无效或已过期") from exc
