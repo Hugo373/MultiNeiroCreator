@@ -1,0 +1,46 @@
+[project]
+name = "multineirocreator-backend"
+version = "0.1.0"
+description = "MultiNeiroCreator 后端：FastAPI + SSE 流式对话 + RAG + Agent 工具"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141",
+    "uvicorn[standard]>=0.52",   # standard = uvloop/httptools，SSE 流式性能依赖 uvloop
+    "python-dotenv>=1.0",
+    "python-multipart>=0.0.18",  # FastAPI UploadFile 表单解析
+    "pydantic[email]>=2.13",     # email extra 提供 EmailStr 校验（替代原直接依赖 email-validator）
+    "zhipuai>=2.1",              # 对话模型 glm-4-flash
+    "google-genai>=2.16",        # embedding 模型 gemini-embedding-001
+    "langchain-core>=1.5",       # 只用 @tool 装饰器
+    "chromadb>=1.5",             # RAG 向量库
+    "pypdf>=6.0",                # 文档解析：PDF
+    "python-docx>=1.1",          # 文档解析：docx
+    "ddgs>=9.0",                 # 联网搜索工具
+    "pytz>=2025.2",
+    "bcrypt>=4.0.1",             # 直接调用 bcrypt（passlib 已移除：全仓未使用）
+    "python-jose[cryptography]>=3.3",
+    "aiosmtplib>=3.0",
+    "redis>=8.0",
+]
+
+# PEP 735 依赖组：uv sync --all-groups 安装；生产部署 uv sync 只装主依赖
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.25",  # tests/test_ratelimit.py 用 async 测试函数（asyncio_mode=auto）
+    "pytest-cov>=6.0",
+    "ruff>=0.9",
+    "mypy>=1.13",
+    "httpx>=0.27",   # 测试用 API 客户端（TestClient 底层）
+]
+
+[tool.uv]
+# 这是应用不是库：不构建/安装项目自身，只管理依赖
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# 把 backend/ 加进 sys.path（前插，同时压过 chromadb 向 site-packages 泄漏的顶层 schemas 包），
+# 让测试能 import schemas/core/services（项目非包安装，package=false）
+pythonpath = ["."]
+asyncio_mode = "auto"  # 原 pytest.ini 内容，已合并到这里
