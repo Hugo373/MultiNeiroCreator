@@ -1,4 +1,5 @@
 import chromadb
+
 from core.config import BACKEND_DIR
 
 DEFAULT_COLLECTION_NAME = "documents"

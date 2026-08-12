@@ -101,7 +101,8 @@ def list_indexed_documents(
     documents = results.get("documents") or []
 
     grouped: dict[tuple[str, int, int, str], dict] = {}
-    for metadata, document in zip(metadatas, documents):
+    # chroma 返回的是等长平行列表；strict=False 保持旧 zip 截断语义，不因单侧异常空值直接 500
+    for metadata, document in zip(metadatas, documents, strict=False):
         key = (
             str(metadata.get("source", "")),
             int(metadata.get("user_id", -1)),
@@ -173,7 +174,7 @@ def get_indexed_document_chunks(
         return []
 
     ordered_chunks = sorted(
-        zip(metadatas, documents),
+        zip(metadatas, documents, strict=False),
         key=lambda item: int(item[0].get("chunk_index", 0)),
     )
     return [document for _, document in ordered_chunks]

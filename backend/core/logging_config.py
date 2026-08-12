@@ -48,14 +48,17 @@ class DevFormatter(logging.Formatter):
     """开发环境：单行可读，自定义字段以 key=value 追加在行尾。"""
 
     def format(self, record: logging.LogRecord) -> str:
+        # request_id/user_id 由 RequestContextFilter 动态注入，LogRecord 类型上没有声明，
+        # 用 getattr 取值：既让 mypy 通过，也兜住 Filter 未挂载的边界情况（如第三方 logger）
         base = (
             f"{self.formatTime(record, '%H:%M:%S')} "
-            f"{record.levelname:<7} [{record.request_id}] "
+            f"{record.levelname:<7} [{getattr(record, 'request_id', '-')}] "
             f"{record.name}: {record.getMessage()}"
         )
         extras = _extra_fields(record)
-        if record.user_id != "-":
-            extras = {"user_id": record.user_id, **extras}
+        user_id = getattr(record, "user_id", "-")
+        if user_id != "-":
+            extras = {"user_id": user_id, **extras}
         if extras:
             base += " | " + " ".join(f"{k}={v}" for k, v in extras.items())
         if record.exc_info:
@@ -71,8 +74,8 @@ class JsonFormatter(logging.Formatter):
             "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z"),
             "level": record.levelname,
             "logger": record.name,
-            "request_id": record.request_id,
-            "user_id": record.user_id,
+            "request_id": getattr(record, "request_id", "-"),
+            "user_id": getattr(record, "user_id", "-"),
             "message": record.getMessage(),
             **_extra_fields(record),
         }

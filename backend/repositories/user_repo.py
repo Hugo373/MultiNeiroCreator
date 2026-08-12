@@ -1,10 +1,9 @@
 import sqlite3
-from typing import Optional
 
 from core.database import get_connection
 
 
-def get_user_by_username(username: str) -> Optional[sqlite3.Row]:
+def get_user_by_username(username: str) -> sqlite3.Row | None:
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     row = conn.execute(

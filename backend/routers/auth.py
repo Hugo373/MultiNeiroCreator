@@ -4,7 +4,6 @@ from core.ratelimit import login_rate_limit, register_rate_limit, send_code_rate
 from schemas.auth import AuthRequest, RegisterRequest, SendCodeRequest
 from services.auth_service import login, register, send_code
 
-
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 

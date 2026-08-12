@@ -6,7 +6,6 @@ from services.project_service import create_project as service_create_project
 from services.project_service import get_project as service_get_project
 from services.project_service import list_recent_projects
 
-
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 

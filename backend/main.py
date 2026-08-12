@@ -1,7 +1,7 @@
 import logging
 
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from core.bodylimit import BodySizeLimitMiddleware
 from core.config import APP_ENV, CORS_ORIGINS, IS_PRODUCTION, REDIS_URL

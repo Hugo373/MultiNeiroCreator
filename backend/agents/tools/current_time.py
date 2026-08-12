@@ -1,5 +1,5 @@
-from datetime import datetime
 import logging
+from datetime import datetime
 
 import pytz
 from langchain_core.tools import tool
@@ -33,4 +33,4 @@ def get_current_time() -> str:
             "获取全球时间失败: %s", type(exc).__name__, exc_info=True,
             extra={"evt": "tool_time_error", "error_type": type(exc).__name__},
         )
-        return f"获取全球时间失败: {str(exc)}"
+        return f"获取全球时间失败: {exc!s}"

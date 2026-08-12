@@ -16,7 +16,6 @@ from services.assistant_service import (
     upload_document,
 )
 
-
 router = APIRouter(tags=["assistant"])
 
 

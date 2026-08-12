@@ -4,17 +4,24 @@ import logging
 import os
 import tempfile
 import time
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from fastapi import HTTPException, UploadFile
 from starlette.concurrency import iterate_in_threadpool
 
 from agents.neyria import build_system_prompt, client, tools_map, tools_schema
 from core import config
-from repositories.chat_repo import append_message, clear_history as repo_clear_history, list_history
+from repositories.chat_repo import append_message, list_history
+from repositories.chat_repo import clear_history as repo_clear_history
 from repositories.user_repo import get_profile, update_profile
-from services.rag import add_document, delete_document, get_document_chunks, list_documents, reindex_document, replace_document, search
-
+from services.rag import (
+    delete_document,
+    get_document_chunks,
+    list_documents,
+    reindex_document,
+    replace_document,
+    search,
+)
 
 MAX_ATTACHMENT_CONTEXT_CHARS = 12000
 MAX_RETRIEVED_CONTEXT_CHARS = 6000
@@ -72,11 +79,11 @@ async def upload_document(file: UploadFile, user_id: int, project_id: int | None
         )
         return {"status": "success", "message": f"成功导入文档: {file.filename}（共分切成 {chunks_count} 块）"}
     except Exception as exc:
-        logger.error(
-            "文档导入失败", exc_info=True,
+        logger.exception(
+            "文档导入失败",
             extra={"evt": "doc_import_error", "error_type": type(exc).__name__},
         )
-        return {"status": "error", "message": f"导入失败: {str(exc)}"}
+        return {"status": "error", "message": f"导入失败: {exc!s}"}
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
@@ -203,8 +210,8 @@ async def stream_chat(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error(
-            "对话流中断: %s", type(exc).__name__, exc_info=True,
+        logger.exception(
+            "对话流中断: %s", type(exc).__name__,
             extra={
                 "evt": "chat_stream_error",
                 "error_type": type(exc).__name__,
@@ -358,8 +365,8 @@ async def _stream_chat_impl(
                     },
                 )
             except Exception as exc:
-                logger.error(
-                    "工具执行失败: %s", type(exc).__name__, exc_info=True,
+                logger.exception(
+                    "工具执行失败: %s", type(exc).__name__,
                     extra={
                         "evt": "tool_error",
                         "tool": func_name,

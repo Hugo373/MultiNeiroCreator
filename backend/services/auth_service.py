@@ -1,16 +1,15 @@
 import logging
 import secrets
 import sqlite3
+from email.mime.text import MIMEText
 
 import aiosmtplib
 import redis
-from email.mime.text import MIMEText
 from fastapi import HTTPException
 
 from core.config import MAIL_HOST, MAIL_PASS, MAIL_PORT, MAIL_USER, REDIS_URL
 from core.security import create_token, hash_password, verify_password
 from repositories.user_repo import create_user, get_user_by_username
-
 
 CODE_TTL_SECONDS = 300
 CODE_MAX_ATTEMPTS = 5
@@ -93,8 +92,8 @@ async def send_code(username: str) -> dict:
         )
     except Exception as exc:
         # 完整错误只进日志：SMTP 异常文本可能含主机/账号等内部信息，不能回给客户端
-        logger.error(
-            "验证码邮件发送失败: %s", type(exc).__name__, exc_info=True,
+        logger.exception(
+            "验证码邮件发送失败: %s", type(exc).__name__,
             extra={"evt": "mail_send_error", "error_type": type(exc).__name__},
         )
         raise HTTPException(status_code=500, detail="邮件发送失败，请稍后重试") from exc

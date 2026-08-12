@@ -44,3 +44,38 @@ testpaths = ["tests"]
 # 让测试能 import schemas/core/services（项目非包安装，package=false）
 pythonpath = ["."]
 asyncio_mode = "auto"  # 原 pytest.ini 内容，已合并到这里
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+# 在默认基础上显式选择规则集：E/W 风格、F 逻辑错误、I 导入排序、B 常见 bug、
+# UP 现代化语法、SIM 可简化、G 日志用法、DTZ 时区安全、RUF ruff 自有、T20 禁 print（强制走 logging）
+select = ["E4", "E7", "E9", "W", "F", "I", "B", "UP", "SIM", "G", "DTZ", "RUF", "T20"]
+# BLE001（禁 except Exception）不启用：本项目约定是“允许宽捕获但必须记日志或注释说明”（见 solved.md #25）；
+# RUF001/002/003 是中文全角标点误报（注释/文档字符串大量中文），对本项目无意义
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+# 测试里的 print 是合理的调试/压测输出（pytest -s 可见），不强制走 logging
+"tests/**" = ["T20"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI 依赖注入惯用法：默认参数里调用 Depends()/Query()/File() 是框架设计，不是 B008 要抓的 bug
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.File", "fastapi.Header", "fastapi.Body"]
+
+[tool.mypy]
+python_version = "3.12"
+# 按 todo §4.2：先覆盖 core/schemas/services.rag，不第一天追求全仓零错误
+files = ["core", "schemas", "services/rag"]
+# 项目非包安装且各目录无 __init__.py（命名空间包）：显式告诉 mypy 以 backend/ 为包根，
+# 否则 core/config.py 会被同时解析成 config 和 core.config 两个模块名而报错
+explicit_package_bases = true
+mypy_path = "."
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+# 第三方库无 stubs 的不报 import 错误（逐步收紧）
+ignore_missing_imports = true

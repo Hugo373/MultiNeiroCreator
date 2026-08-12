@@ -1,6 +1,5 @@
 import sqlite3
-from datetime import datetime
-from typing import Optional
+from datetime import UTC, datetime
 
 from core.config import DB_FILE
 
@@ -71,10 +70,11 @@ def get_project(user_id: int, project_id: int) -> dict | None:
     return _row_to_project_payload(row)
 
 
-def create_project(user_id: int, name: Optional[str] = None, project_path: Optional[str] = None) -> dict:
+def create_project(user_id: int, name: str | None = None, project_path: str | None = None) -> dict:
     init_projects_table()
 
-    now = datetime.now()
+    # 项目名和时间戳按本地时间展示给用户；先取带时区的 UTC 再转本地，避免 naive datetime（DTZ005）
+    now = datetime.now(UTC).astimezone()
     timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
     project_name = _normalize_project_name(name, now)
     path_label = (project_path or "").strip()[:200] or "本地项目文件夹"
@@ -122,7 +122,7 @@ def _row_to_project_payload(row: sqlite3.Row) -> dict:
     }
 
 
-def _normalize_project_name(name: Optional[str], now: datetime) -> str:
+def _normalize_project_name(name: str | None, now: datetime) -> str:
     cleaned = (name or "").strip()
     if cleaned:
         return cleaned[:120]

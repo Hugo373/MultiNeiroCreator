@@ -5,7 +5,6 @@ from agents.tools.current_time import get_current_time
 from agents.tools.search_web import search_web
 from core.config import API_KEY
 
-
 client = ZhipuAI(api_key=API_KEY) if API_KEY else None
 
 tools_schema = [

@@ -1,4 +1,3 @@
-from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -16,7 +15,7 @@ class ChatRequest(BaseModel):
     # 注意：不接收 history——对话历史以服务端数据库为唯一真源（A5），客户端多传的字段会被忽略
     message: str = Field(..., max_length=config.CHAT_MESSAGE_MAX_CHARS)
     project_id: int | None = None
-    attachments: List[ChatAttachment] = Field(
+    attachments: list[ChatAttachment] = Field(
         default_factory=list, max_length=config.CHAT_ATTACHMENTS_MAX_ITEMS
     )
 

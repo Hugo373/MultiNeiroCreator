@@ -16,7 +16,14 @@ client_ai = (
 )
 
 
-def get_embedding(text: str):
+def _extract_vector(result, context: str) -> list[float]:
+    """从 SDK 响应中取出向量，SDK 类型上 embeddings/values 都是 Optional，做显式防御。"""
+    if not result.embeddings or result.embeddings[0].values is None:
+        raise RuntimeError(f"{context}：embedding API 返回了空结果")
+    return list(result.embeddings[0].values)
+
+
+def get_embedding(text: str) -> list[float]:
     if client_ai is None:
         raise RuntimeError("未配置 API_KEY，RAG 向量检索暂不可用")
 
@@ -38,7 +45,7 @@ def get_embedding(text: str):
         extra={"evt": "embed_query", "model": EMBEDDING_MODEL, "text_chars": len(text),
                "duration_ms": round((time.perf_counter() - started) * 1000, 1)},
     )
-    return result.embeddings[0].values
+    return _extract_vector(result, "查询向量化")
 
 
 def get_embeddings_batch(texts: list[str]) -> list[list[float]]:
@@ -49,7 +56,7 @@ def get_embeddings_batch(texts: list[str]) -> list[list[float]]:
         raise RuntimeError("未配置 API_KEY，文档向量化暂不可用")
 
     started = time.perf_counter()
-    embeddings = []
+    embeddings: list[list[float]] = []
 
     # 串行逐条调用是已知性能债（G1），这里先把耗时记下来，压测时好对比优化前后
     for index, text in enumerate(texts):
@@ -65,7 +72,7 @@ def get_embeddings_batch(texts: list[str]) -> list[list[float]]:
                        "failed_index": index, "total_chunks": len(texts)},
             )
             raise
-        embeddings.append(result.embeddings[0].values)
+        embeddings.append(_extract_vector(result, f"批量向量化(第 {index + 1}/{len(texts)} 条)"))
 
     logger.info(
         "批量向量化完成",

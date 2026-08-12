@@ -3,7 +3,6 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 PROJECT_ROOT_DIR = BACKEND_DIR.parent
 load_dotenv(BACKEND_DIR / ".env")

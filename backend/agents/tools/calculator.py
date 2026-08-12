@@ -43,9 +43,8 @@ def _eval_node(node: ast.AST) -> float:
     if isinstance(node, ast.BinOp) and type(node.op) in _ALLOWED_BINARY_OPS:
         left = _eval_node(node.left)
         right = _eval_node(node.right)
-        if isinstance(node.op, ast.Pow):
-            if abs(left) > _MAX_POW_BASE or abs(right) > _MAX_POW_EXPONENT:
-                raise ValueError("幂运算数值超出允许范围")
+        if isinstance(node.op, ast.Pow) and (abs(left) > _MAX_POW_BASE or abs(right) > _MAX_POW_EXPONENT):
+            raise ValueError("幂运算数值超出允许范围")
         return _ALLOWED_BINARY_OPS[type(node.op)](left, right)
 
     raise ValueError(f"表达式包含不允许的语法: {type(node).__name__}")

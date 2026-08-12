@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import bcrypt
 from fastapi import HTTPException
@@ -7,7 +7,6 @@ from jose import JWTError, jwt
 
 from core.config import ACCESS_TOKEN_EXPIRE_DAYS, ALGORITHM, SECRET_KEY
 from core.logging_config import user_id_var
-
 
 bearer_scheme = HTTPBearer()
 
@@ -26,7 +25,8 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 
 def create_token(user_id: int, username: str) -> str:
-    expire = datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
+    # 用带时区的 UTC 时间：utcnow() 返回的 naive datetime 在跨时区/夏令时场景下语义模糊，Python 3.12 已软弃用
+    expire = datetime.now(UTC) + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
     return jwt.encode({"sub": str(user_id), "username": username, "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
 
 
