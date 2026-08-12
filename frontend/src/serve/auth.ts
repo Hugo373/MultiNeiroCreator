@@ -6,10 +6,13 @@ export interface AuthPayload {
 }
 
 export const login = (data: AuthPayload) =>
-  request.post<any, { token: string; username: string }>('/auth/login', data)
+  request.post<unknown, { token: string; username: string }>('/auth/login', data)
 
 export const sendCode = (username: string) =>
-  request.post<any, { status: string; message: string }>('/auth/send-code', { username, password: '' })
+  request.post<unknown, { status: string; message: string }>('/auth/send-code', {
+    username,
+    password: '',
+  })
 
 export const register = (data: AuthPayload & { code: string }) =>
-  request.post<any, { token: string; username: string }>('/auth/register', data)
+  request.post<unknown, { token: string; username: string }>('/auth/register', data)

@@ -13,7 +13,9 @@
       :class="[`is-${message.role}`, { 'is-error': message.isError }]"
     >
       <div class="agent-message-meta">
-        <div v-if="message.toolName" class="agent-tool-chip">{{ formatToolName(message.toolName) }}</div>
+        <div v-if="message.toolName" class="agent-tool-chip">
+          {{ formatToolName(message.toolName) }}
+        </div>
       </div>
       <div
         class="agent-message-bubble"

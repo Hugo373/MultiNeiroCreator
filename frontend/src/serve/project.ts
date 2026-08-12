@@ -11,10 +11,13 @@ export interface ProjectPayload {
 }
 
 export const createProject = (name?: string, projectPath?: string) =>
-  request.post<any, { project: ProjectPayload }>('/projects', { name, project_path: projectPath })
+  request.post<unknown, { project: ProjectPayload }>('/projects', {
+    name,
+    project_path: projectPath,
+  })
 
 export const getRecentProjects = (limit = 8) =>
-  request.get<any, { items: ProjectPayload[] }>(`/projects/recent?limit=${limit}`)
+  request.get<unknown, { items: ProjectPayload[] }>(`/projects/recent?limit=${limit}`)
 
 export const getProject = (projectId: number) =>
-  request.get<any, { project: ProjectPayload }>(`/projects/${projectId}`)
+  request.get<unknown, { project: ProjectPayload }>(`/projects/${projectId}`)

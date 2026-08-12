@@ -54,7 +54,7 @@ export function useAutoSave() {
   function syncTimer(mode: AutoSaveMode) {
     clearTimer()
 
-    const activeOption = saveModeOptions.find(item => item.value === mode)
+    const activeOption = saveModeOptions.find((item) => item.value === mode)
     if (!activeOption) return
 
     autoSaveTimer = window.setInterval(() => {
@@ -160,9 +160,7 @@ export function useAutoSave() {
       if (!projectStore.directoryHandle) {
         const handle = await requestProjectDirectoryHandle()
         projectStore.setDirectoryHandle(handle)
-        projectStore.setProjectPath(
-          handle?.name || projectStore.projectPath || '已选择项目文件夹',
-        )
+        projectStore.setProjectPath(handle?.name || projectStore.projectPath || '已选择项目文件夹')
       }
 
       await ensureLocalProjectWorkspace(option.value)

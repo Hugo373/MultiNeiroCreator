@@ -1,19 +1,23 @@
 <template>
   <Transition name="modal-fade">
-    <div
-      v-if="open"
-      class="modal-overlay"
-      :aria-hidden="!open"
-      @click.self="close"
-    >
-      <div class="modal-card project-create-modal" role="dialog" aria-modal="true" aria-labelledby="createProjectTitle">
+    <div v-if="open" class="modal-overlay" :aria-hidden="!open" @click.self="close">
+      <div
+        class="modal-card project-create-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="createProjectTitle"
+      >
         <div class="modal-head">
           <div>
             <div id="createProjectTitle" class="modal-title">
               {{ step === 1 ? '新建项目' : '保存当前工程' }}
             </div>
             <div class="modal-caption">
-              {{ step === 1 ? '先为新的工程文件命名。' : '在进入新项目之前，先确认当前工程的保存方式。' }}
+              {{
+                step === 1
+                  ? '先为新的工程文件命名。'
+                  : '在进入新项目之前，先确认当前工程的保存方式。'
+              }}
             </div>
           </div>
         </div>
@@ -31,21 +35,32 @@
             />
             <div class="project-create-actions">
               <button class="project-secondary-button" type="button" @click="close">取消</button>
-              <button class="project-primary-button" type="button" @click="goToStepTwo">确定</button>
+              <button class="project-primary-button" type="button" @click="goToStepTwo">
+                确定
+              </button>
             </div>
           </div>
 
           <div v-else key="create-step-2" class="modal-body project-create-body">
             <div class="project-create-summary">
               <div class="project-summary-title">是否保存当前工程</div>
-              <div class="project-summary-meta">
-                当前工程：{{ projectStore.displayName }}
-              </div>
+              <div class="project-summary-meta">当前工程：{{ projectStore.displayName }}</div>
             </div>
             <div class="project-create-actions project-create-actions--three">
               <button class="project-secondary-button" type="button" @click="step = 1">取消</button>
-              <button class="project-danger-button" type="button" @click="isDiscardConfirmOpen = true">不保存</button>
-              <button class="project-primary-button" type="button" :disabled="isCreating" @click="saveCurrentAndCreate">
+              <button
+                class="project-danger-button"
+                type="button"
+                @click="isDiscardConfirmOpen = true"
+              >
+                不保存
+              </button>
+              <button
+                class="project-primary-button"
+                type="button"
+                :disabled="isCreating"
+                @click="saveCurrentAndCreate"
+              >
                 {{ isCreating ? '处理中...' : '确定' }}
               </button>
             </div>
@@ -62,7 +77,12 @@
       :aria-hidden="!isDiscardConfirmOpen"
       @click.self="closeDiscardConfirm"
     >
-      <div class="modal-card project-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="discardProjectTitle">
+      <div
+        class="modal-card project-confirm-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="discardProjectTitle"
+      >
         <div class="modal-head">
           <div>
             <div id="discardProjectTitle" class="modal-title">确认不保存</div>
@@ -77,8 +97,15 @@
             </div>
           </div>
           <div class="project-create-actions">
-            <button class="project-secondary-button" type="button" @click="closeDiscardConfirm">取消</button>
-            <button class="project-danger-button" type="button" :disabled="isCreating" @click="discardAndCreate">
+            <button class="project-secondary-button" type="button" @click="closeDiscardConfirm">
+              取消
+            </button>
+            <button
+              class="project-danger-button"
+              type="button"
+              :disabled="isCreating"
+              @click="discardAndCreate"
+            >
               {{ isCreating ? '处理中...' : '确定' }}
             </button>
           </div>
@@ -130,7 +157,7 @@ const isDiscardConfirmOpen = ref(false)
 
 watch(
   () => props.open,
-  opened => {
+  (opened) => {
     if (opened) {
       step.value = 1
       newProjectName.value = ''

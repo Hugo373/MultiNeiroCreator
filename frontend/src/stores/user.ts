@@ -7,7 +7,7 @@ export const useUserStore = defineStore('user', {
     username: localStorage.getItem(USERNAME_KEY) || '',
   }),
   getters: {
-    isLoggedIn: state => !!state.token,
+    isLoggedIn: (state) => !!state.token,
   },
   actions: {
     setUser(token: string, username: string) {

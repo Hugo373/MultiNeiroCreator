@@ -52,10 +52,7 @@ export const useLoadingStore = defineStore('loading', {
      * - 重置 shownAt / realProgress。
      * - 可选配置：minDuration 覆盖默认 1s；label 覆盖默认提示语。
      */
-    show(
-      mode: LoadingMode = 'auto',
-      options?: { minDuration?: number; label?: string },
-    ) {
+    show(mode: LoadingMode = 'auto', options?: { minDuration?: number; label?: string }) {
       if (pendingHideTimer) {
         clearTimeout(pendingHideTimer)
         pendingHideTimer = null
@@ -66,9 +63,7 @@ export const useLoadingStore = defineStore('loading', {
       this.mode = mode
       this.label = options?.label || DEFAULTS[mode]
       this.minDuration =
-        options?.minDuration != null
-          ? Math.max(0, options.minDuration)
-          : DEFAULT_MIN_DURATION
+        options?.minDuration != null ? Math.max(0, options.minDuration) : DEFAULT_MIN_DURATION
     },
 
     /**

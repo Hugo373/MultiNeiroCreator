@@ -21,7 +21,10 @@
     <div
       ref="assistantBodyRef"
       class="assistant-body"
-      :class="{ 'has-floating-composer': true, 'has-attachment-dock': chatStore.hasUploadedAttachments }"
+      :class="{
+        'has-floating-composer': true,
+        'has-attachment-dock': chatStore.hasUploadedAttachments,
+      }"
     >
       <MessageList />
 
@@ -87,8 +90,7 @@ defineExpose({ loadHistory, scrollToBottom })
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.014), rgba(255, 255, 255, 0)),
-    var(--column-bg);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.014), rgba(255, 255, 255, 0)), var(--column-bg);
   overflow: hidden;
 }
 
@@ -204,7 +206,12 @@ defineExpose({ loadHistory, scrollToBottom })
   margin: 4px 0 0;
   padding: 8px 10px 2px 4px;
   color: rgba(255, 255, 255, 0.68);
-  background: linear-gradient(180deg, transparent, rgba(11, 11, 11, 0.92) 32%, rgba(11, 11, 11, 0.98));
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(11, 11, 11, 0.92) 32%,
+    rgba(11, 11, 11, 0.98)
+  );
   pointer-events: none;
   z-index: 1;
 }
@@ -239,7 +246,12 @@ defineExpose({ loadHistory, scrollToBottom })
   right: 0;
   top: -44px;
   height: 44px;
-  background: linear-gradient(180deg, rgba(4, 4, 5, 0), var(--column-bg) 82%, var(--column-bg) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(4, 4, 5, 0),
+    var(--column-bg) 82%,
+    var(--column-bg) 100%
+  );
 }
 
 .composer-wrap {
@@ -250,8 +262,7 @@ defineExpose({ loadHistory, scrollToBottom })
   padding: 18px 18px 14px;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   border-radius: 28px;
-  background:
-    linear-gradient(180deg, #171717, #111111 72%, #0b0b0c 100%);
+  background: linear-gradient(180deg, #171717, #111111 72%, #0b0b0c 100%);
   display: flex;
   flex-direction: column;
   gap: 8px;

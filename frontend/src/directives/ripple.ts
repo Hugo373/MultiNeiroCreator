@@ -1,5 +1,10 @@
 import type { Directive } from 'vue'
 
+// 指令在元素上挂载的清理函数（unmounted 时移除监听器），用类型声明代替 as any
+interface RippleElement extends HTMLElement {
+  _rippleCleanup?: () => void
+}
+
 export const vRipple: Directive = {
   mounted(el: HTMLElement) {
     el.style.position = 'relative'
@@ -20,7 +25,7 @@ export const vRipple: Directive = {
         Math.hypot(x, y),
         Math.hypot(x - rect.width, y),
         Math.hypot(x, y - rect.height),
-        Math.hypot(x - rect.width, y - rect.height)
+        Math.hypot(x - rect.width, y - rect.height),
       )
 
       const ripple = document.createElement('span')
@@ -49,12 +54,12 @@ export const vRipple: Directive = {
 
     el.addEventListener('mouseenter', onEnter)
     el.addEventListener('mouseleave', onLeave)
-    ;(el as any)._rippleCleanup = () => {
+    ;(el as RippleElement)._rippleCleanup = () => {
       el.removeEventListener('mouseenter', onEnter)
       el.removeEventListener('mouseleave', onLeave)
     }
   },
   unmounted(el: HTMLElement) {
-    ;(el as any)._rippleCleanup?.()
+    ;(el as RippleElement)._rippleCleanup?.()
   },
 }

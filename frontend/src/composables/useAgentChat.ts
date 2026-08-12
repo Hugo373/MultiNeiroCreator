@@ -147,7 +147,7 @@ export function useAgentChat(options: UseAgentChatOptions) {
     // 流式回调必须改数组里的响应式代理对象；直接改 seed 原始对象绕过 Vue 响应式（B1 教训）
     const assistantMessage = chatStore.messages[chatStore.messages.length - 1]
     // token 是一簇一簇到达的，经打字机缓冲后按帧匀速上屏，消除跳字感
-    const typewriter = createTypewriter(text => {
+    const typewriter = createTypewriter((text) => {
       if (assistantMessage.isPending) {
         assistantMessage.isPending = false
       }

@@ -36,7 +36,9 @@
             stroke-linejoin="round"
             aria-hidden="true"
           >
-            <path d="M21.44 11.05 12.2 20.29a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.48-8.49" />
+            <path
+              d="M21.44 11.05 12.2 20.29a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.48-8.49"
+            />
           </svg>
         </button>
       </div>
@@ -57,7 +59,10 @@
                 v-for="option in modelOptions"
                 :key="option.value"
                 class="composer-model-option"
-                :class="{ active: chatStore.selectedModel === option.value, disabled: option.disabled }"
+                :class="{
+                  active: chatStore.selectedModel === option.value,
+                  disabled: option.disabled,
+                }"
                 type="button"
                 :disabled="option.disabled"
                 @click="selectModel(option)"
@@ -72,7 +77,11 @@
           class="composer-action primary"
           title="Send"
           type="button"
-          :disabled="chatStore.isSending || chatStore.isUploadingAttachment || (!chatStore.draft.trim() && !chatStore.hasUploadedAttachments)"
+          :disabled="
+            chatStore.isSending ||
+            chatStore.isUploadingAttachment ||
+            (!chatStore.draft.trim() && !chatStore.hasUploadedAttachments)
+          "
           @click="emit('send')"
         >
           <span class="composer-action-icon">{{ chatStore.isSending ? '...' : '↑' }}</span>
@@ -114,7 +123,9 @@ const modelOptions: ModelOption[] = [
 ]
 
 const selectedModelLabel = computed(() => {
-  return modelOptions.find(option => option.value === chatStore.selectedModel)?.label || 'GLM-4-Flash'
+  return (
+    modelOptions.find((option) => option.value === chatStore.selectedModel)?.label || 'GLM-4-Flash'
+  )
 })
 
 function selectModel(option: ModelOption) {
@@ -258,7 +269,9 @@ onBeforeUnmount(() => {
 
 .composer-action-icon {
   display: inline-block;
-  transition: transform 180ms ease, opacity 180ms ease;
+  transition:
+    transform 180ms ease,
+    opacity 180ms ease;
 }
 
 .composer-action.primary {
@@ -323,7 +336,9 @@ onBeforeUnmount(() => {
     rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06) !important;
   color: var(--text-secondary);
-  transition: background-color 150ms ease-out, color 180ms ease;
+  transition:
+    background-color 150ms ease-out,
+    color 180ms ease;
 }
 
 .composer-model-button:hover {
@@ -359,7 +374,10 @@ onBeforeUnmount(() => {
   gap: 2px;
   color: var(--text-primary);
   background: transparent;
-  transition: background 160ms ease, transform 160ms ease, opacity 160ms ease;
+  transition:
+    background 160ms ease,
+    transform 160ms ease,
+    opacity 160ms ease;
 }
 
 .composer-model-option:hover:not(.disabled) {

@@ -17,11 +17,7 @@
         </button>
 
         <template v-if="attachment.kind === 'image' && attachment.previewUrl">
-          <img
-            class="attachment-chip-image"
-            :src="attachment.previewUrl"
-            :alt="attachment.name"
-          />
+          <img class="attachment-chip-image" :src="attachment.previewUrl" :alt="attachment.name" />
           <div class="attachment-chip-image-caption">{{ attachment.name }}</div>
         </template>
 
@@ -93,8 +89,7 @@ const chatStore = useChatStore()
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.014)),
-    #111112;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.014)), #111112;
 }
 
 .attachment-chip {

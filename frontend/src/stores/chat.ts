@@ -77,7 +77,10 @@ export const useChatStore = defineStore('chat', () => {
     messages.value = []
   }
 
-  function setMessagesFromHistory(history: AgentHistoryItem[], hydrate: (item: AgentHistoryItem) => AgentMessage) {
+  function setMessagesFromHistory(
+    history: AgentHistoryItem[],
+    hydrate: (item: AgentHistoryItem) => AgentMessage,
+  ) {
     clearMessages()
     messages.value = history.map(hydrate)
   }
@@ -90,7 +93,7 @@ export const useChatStore = defineStore('chat', () => {
   function upsertUploadedAttachment(file: File) {
     const nextAttachment = buildUploadedAttachment(file)
     const existingIndex = uploadedAttachments.value.findIndex(
-      item => item.name === nextAttachment.name,
+      (item) => item.name === nextAttachment.name,
     )
 
     if (existingIndex >= 0) {

@@ -57,14 +57,14 @@
               for AI-native music.
             </h1>
             <p class="hero-description">
-              MultiNeiroCreator combines composition, lyrics, visual generation, PV workflow,
-              and assistant orchestration inside one continuous surface instead of scattered tools.
+              MultiNeiroCreator combines composition, lyrics, visual generation, PV workflow, and
+              assistant orchestration inside one continuous surface instead of scattered tools.
             </p>
 
             <div class="hero-actions">
-              <a class="hero-primary" @click="openAuthEntry" v-ripple>Open Workstation</a>
-              <a href="#features" class="hero-secondary" v-ripple>Explore Capabilities</a>
-              <a href="#workflow" class="hero-secondary" v-ripple>See Workflow</a>
+              <a v-ripple class="hero-primary" @click="openAuthEntry">Open Workstation</a>
+              <a v-ripple href="#features" class="hero-secondary">Explore Capabilities</a>
+              <a v-ripple href="#workflow" class="hero-secondary">See Workflow</a>
             </div>
 
             <div class="hero-bottom-note">Scroll to explore</div>
@@ -74,7 +74,12 @@
             <div class="hero-side-panel">
               <div class="side-kicker">Organize creative flows by</div>
               <div class="side-filter-list">
-                <button v-for="filter in sideFilters" :key="filter" class="side-filter" type="button">
+                <button
+                  v-for="filter in sideFilters"
+                  :key="filter"
+                  class="side-filter"
+                  type="button"
+                >
                   {{ filter }}
                 </button>
               </div>
@@ -89,8 +94,9 @@
             <div class="section-kicker">Capabilities</div>
             <h2 class="section-title">One surface for modular creation.</h2>
             <p class="section-copy">
-              The front page now uses larger full-width sections, tighter hierarchy, and more controlled
-              motion so the product feels like a real platform instead of a small centered landing block.
+              The front page now uses larger full-width sections, tighter hierarchy, and more
+              controlled motion so the product feels like a real platform instead of a small
+              centered landing block.
             </p>
           </div>
 
@@ -112,11 +118,14 @@
           <div class="section-intro section-intro--split">
             <div>
               <div class="section-kicker">Workflow</div>
-              <h2 class="section-title">Structured like a production flow, not a stack of widgets.</h2>
+              <h2 class="section-title">
+                Structured like a production flow, not a stack of widgets.
+              </h2>
             </div>
             <p class="section-copy">
-              The visual rhythm now follows large narrative blocks: hero, capability matrix, workflow,
-              and conversion. That is the main reason the reference site feels more premium.
+              The visual rhythm now follows large narrative blocks: hero, capability matrix,
+              workflow, and conversion. That is the main reason the reference site feels more
+              premium.
             </p>
           </div>
 
@@ -144,15 +153,24 @@
           <div class="about-list">
             <div class="about-item">
               <div class="about-item-title">Fill</div>
-              <div class="about-item-copy">Hero and major sections now occupy the browser as a stage instead of a centered card.</div>
+              <div class="about-item-copy">
+                Hero and major sections now occupy the browser as a stage instead of a centered
+                card.
+              </div>
             </div>
             <div class="about-item">
               <div class="about-item-title">Motion</div>
-              <div class="about-item-copy">Buttons and panels use restrained lift and contrast changes instead of noisy glow effects.</div>
+              <div class="about-item-copy">
+                Buttons and panels use restrained lift and contrast changes instead of noisy glow
+                effects.
+              </div>
             </div>
             <div class="about-item">
               <div class="about-item-title">Depth</div>
-              <div class="about-item-copy">Background animation stays behind a stable content layer so the page feels alive without becoming messy.</div>
+              <div class="about-item-copy">
+                Background animation stays behind a stable content layer so the page feels alive
+                without becoming messy.
+              </div>
             </div>
           </div>
         </div>
@@ -162,7 +180,9 @@
     <footer class="home-footer">
       <div class="shell-frame footer-frame">
         <div class="footer-brand">MultiNeiroCreator</div>
-        <div class="footer-copy">AI native workstation for music, visuals, and agent-driven creation.</div>
+        <div class="footer-copy">
+          AI native workstation for music, visuals, and agent-driven creation.
+        </div>
         <a class="footer-button" @click="openAuthEntry">Enter</a>
       </div>
     </footer>
@@ -273,7 +293,7 @@ onUnmounted(() => {
 }
 
 .home-shell::before {
-  content: "";
+  content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;

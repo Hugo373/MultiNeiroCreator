@@ -15,7 +15,7 @@ function decodeJwtPayload(token: string): JwtPayload | null {
     const json = decodeURIComponent(
       atob(base64)
         .split('')
-        .map(char => '%' + ('00' + char.charCodeAt(0).toString(16)).slice(-2))
+        .map((char) => '%' + ('00' + char.charCodeAt(0).toString(16)).slice(-2))
         .join(''),
     )
     return JSON.parse(json) as JwtPayload

@@ -33,7 +33,7 @@ export async function uploadAgentDocument(file: File, projectId?: number | null)
   const formData = new FormData()
   formData.append('file', file)
   const suffix = projectId != null ? `?project_id=${projectId}` : ''
-  return request.post<any, AgentDocumentMutationResponse>(`/upload${suffix}`, formData, {
+  return request.post<unknown, AgentDocumentMutationResponse>(`/upload${suffix}`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -41,7 +41,7 @@ export async function uploadAgentDocument(file: File, projectId?: number | null)
 }
 
 export async function deleteAgentDocument(filename: string, projectId?: number | null) {
-  return request.delete<any, AgentDocumentMutationResponse>('/documents', {
+  return request.delete<unknown, AgentDocumentMutationResponse>('/documents', {
     data: {
       filename,
       project_id: projectId,
@@ -76,9 +76,7 @@ interface AgentStreamHandlers {
 // 解析单个 SSE 块并分发事件。单行损坏（坏 JSON / 未知类型）只丢弃该行，
 // 绝不向上抛异常中断整个流（B4）：已收到的内容和后续 token 必须保住。
 function dispatchSseBlock(block: string, handlers: AgentStreamHandlers) {
-  const line = block
-    .split('\n')
-    .find(item => item.startsWith('data: '))
+  const line = block.split('\n').find((item) => item.startsWith('data: '))
 
   if (!line) return
 
@@ -101,7 +99,7 @@ function dispatchSseBlock(block: string, handlers: AgentStreamHandlers) {
 
 export const getAgentHistory = (projectId?: number | null) => {
   const suffix = projectId != null ? `?project_id=${projectId}` : ''
-  return request.get<any, AgentHistoryItem[]>(`/history${suffix}`)
+  return request.get<unknown, AgentHistoryItem[]>(`/history${suffix}`)
 }
 
 export async function streamAgentChat(

@@ -39,9 +39,11 @@ export const USER_CANCELLED_DIRECTORY_PICKER = 'USER_CANCELLED_DIRECTORY_PICKER'
 
 /** 弹出目录选择器；浏览器不支持/用户取消均以 Error 形式抛出 */
 export function requestProjectDirectoryHandle(): Promise<BrowserDirectoryHandle> {
-  const directoryPicker = (window as Window & {
-    showDirectoryPicker?: () => Promise<BrowserDirectoryHandle>
-  }).showDirectoryPicker
+  const directoryPicker = (
+    window as Window & {
+      showDirectoryPicker?: () => Promise<BrowserDirectoryHandle>
+    }
+  ).showDirectoryPicker
 
   if (!directoryPicker) {
     throw new Error('当前浏览器不支持选择文件夹，请使用 Chromium 内核浏览器')
@@ -53,7 +55,9 @@ export function requestProjectDirectoryHandle(): Promise<BrowserDirectoryHandle>
 }
 
 export function isDirectoryPickerSupported() {
-  return typeof (window as Window & { showDirectoryPicker?: unknown }).showDirectoryPicker === 'function'
+  return (
+    typeof (window as Window & { showDirectoryPicker?: unknown }).showDirectoryPicker === 'function'
+  )
 }
 
 export async function writeLocalJsonFile(

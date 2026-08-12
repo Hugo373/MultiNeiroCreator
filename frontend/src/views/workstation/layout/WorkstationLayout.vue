@@ -27,7 +27,9 @@
                   @click.stop="isSaveModeOpen = !isSaveModeOpen"
                 >
                   <Transition name="save-mode-label" mode="out-in">
-                    <span :key="currentSaveModeLabel" class="status-button-label">{{ currentSaveModeLabel }}</span>
+                    <span :key="currentSaveModeLabel" class="status-button-label">{{
+                      currentSaveModeLabel
+                    }}</span>
                   </Transition>
                   <span>▾</span>
                 </button>
@@ -109,7 +111,12 @@
               <div id="modalTitle" class="modal-title">添加工具</div>
               <div class="modal-caption">为当前项目追加新的创作模块或 Agent 插件。</div>
             </div>
-            <button class="modal-close" type="button" aria-label="Close" @click="isToolModalOpen = false">
+            <button
+              class="modal-close"
+              type="button"
+              aria-label="Close"
+              @click="isToolModalOpen = false"
+            >
               ✕
             </button>
           </div>
@@ -141,7 +148,12 @@
         :aria-hidden="!isProjectWarningOpen"
         @click.self="isProjectWarningOpen = false"
       >
-        <div class="modal-card project-warning-modal" role="alertdialog" aria-modal="true" aria-labelledby="projectWarningTitle">
+        <div
+          class="modal-card project-warning-modal"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="projectWarningTitle"
+        >
           <div class="modal-head">
             <div>
               <div id="projectWarningTitle" class="modal-title">{{ projectWarningTitle }}</div>
@@ -156,7 +168,13 @@
               </div>
             </div>
             <div class="project-warning-actions">
-              <button class="project-danger-button" type="button" @click="isProjectWarningOpen = false">确定</button>
+              <button
+                class="project-danger-button"
+                type="button"
+                @click="isProjectWarningOpen = false"
+              >
+                确定
+              </button>
             </div>
           </div>
         </div>
@@ -178,7 +196,12 @@ import { useLoadingStore } from '@/stores/loading'
 import { useUserStore } from '@/stores/user'
 import { normalizeSaveMode, useProjectStore, type RecentProjectItem } from '@/stores/project'
 import { useChatStore } from '@/stores/chat'
-import { saveModeLabels, saveModeOptions, useAutoSave, type SaveModeOption } from '@/composables/useAutoSave'
+import {
+  saveModeLabels,
+  saveModeOptions,
+  useAutoSave,
+  type SaveModeOption,
+} from '@/composables/useAutoSave'
 import {
   isDirectoryPickerSupported,
   readProjectDirectory,
@@ -342,7 +365,10 @@ async function handleOpenProjectPicker() {
         return
       }
       if (error.message === 'INVALID_PROJECT_FILE') {
-        openProjectWarning('项目文件不合法', '检测到 `project.json`，但内容格式不符合当前项目要求。')
+        openProjectWarning(
+          '项目文件不合法',
+          '检测到 `project.json`，但内容格式不符合当前项目要求。',
+        )
         return
       }
     }
@@ -760,8 +786,7 @@ onBeforeUnmount(() => {
   border-left: 1px solid var(--line) !important;
   background:
     radial-gradient(circle at top, rgba(255, 255, 255, 0.04), transparent 34%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)),
-    var(--column-bg);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)), var(--column-bg);
   position: relative;
   overflow: hidden;
 }

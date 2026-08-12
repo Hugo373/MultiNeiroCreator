@@ -10,7 +10,7 @@
         <p class="intro-description">
           Composition, lyrics, visuals, PV workflow, and Neyria live inside one creative surface.
         </p>
-        
+
         <div class="intro-tip">Click anywhere to begin</div>
       </div>
     </Transition>

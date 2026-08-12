@@ -1,18 +1,10 @@
 <template>
   <div ref="rootRef" class="topbar-combined">
-    <div
-      class="combined-left"
-      :aria-expanded="isProjectOpen"
-      @click.stop="toggleProjectPanel"
-    >
+    <div class="combined-left" :aria-expanded="isProjectOpen" @click.stop="toggleProjectPanel">
       <span class="combined-label">{{ projectStore.tabLabel }}</span>
     </div>
     <div class="combined-divider" aria-hidden="true"></div>
-    <div
-      class="combined-right"
-      :aria-expanded="isSearchOpen"
-      @click.stop="toggleSearchPanel"
-    >
+    <div class="combined-right" :aria-expanded="isSearchOpen" @click.stop="toggleSearchPanel">
       <span class="combined-right-text">搜索</span>
       <span class="search-signal" :class="{ active: isSearchOpen }" aria-hidden="true"></span>
     </div>
@@ -117,7 +109,7 @@ const filteredSearchResults = computed(() => {
   if (!keyword) return []
 
   return searchIndex
-    .filter(item => `${item.title} ${item.meta}`.toLowerCase().includes(keyword))
+    .filter((item) => `${item.title} ${item.meta}`.toLowerCase().includes(keyword))
     .slice(0, 5)
 })
 
@@ -205,7 +197,9 @@ onBeforeUnmount(() => {
 .combined-label {
   color: var(--text-secondary);
   white-space: nowrap;
-  transition: color 180ms ease, opacity 180ms ease;
+  transition:
+    color 180ms ease,
+    opacity 180ms ease;
 }
 
 .combined-left,
@@ -240,7 +234,9 @@ onBeforeUnmount(() => {
 
 .combined-right-text {
   color: var(--text-secondary);
-  transition: color 180ms ease, opacity 180ms ease;
+  transition:
+    color 180ms ease,
+    opacity 180ms ease;
 }
 
 .combined-left:hover {

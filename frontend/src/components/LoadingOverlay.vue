@@ -16,12 +16,7 @@
       - 无任何路由依赖，无任何外部组件联动，零侵入挂载
   -->
   <Transition name="overlay" appear>
-    <div
-      v-if="loading.visible"
-      class="loading-page"
-      role="status"
-      aria-live="polite"
-    >
+    <div v-if="loading.visible" class="loading-page" role="status" aria-live="polite">
       <div class="grid-veil" aria-hidden="true"></div>
 
       <div class="stage">
@@ -72,8 +67,7 @@ const loading = useLoadingStore()
 const { visible, realProgress } = storeToRefs(loading)
 
 const prefersReduced =
-  typeof window !== 'undefined' &&
-  window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 // 内置动画时长（仅在"无真实进度"时起兜底视觉作用，让快速加载也有动画）
 const INTERNAL_DWELL = prefersReduced ? 800 : 2400
@@ -148,23 +142,23 @@ onBeforeUnmount(() => {
 ------------------------------------------------------------ */
 .loading-page {
   /* —— 黑白灰三色 —— */
-  --bg:         #040405;
-  --bg-2:       #060608;
-  --fg:         #f4f4f4;
-  --fg-soft:    #d6d6d6;
-  --fg-mute:    #8c8c8c;
-  --fg-faint:   #4a4a4a;
+  --bg: #040405;
+  --bg-2: #060608;
+  --fg: #f4f4f4;
+  --fg-soft: #d6d6d6;
+  --fg-mute: #8c8c8c;
+  --fg-faint: #4a4a4a;
 
   /* —— 线条档位 —— */
-  --line:        rgba(244, 244, 244, 0.10);
-  --line-mid:    rgba(244, 244, 244, 0.22);
+  --line: rgba(244, 244, 244, 0.1);
+  --line-mid: rgba(244, 244, 244, 0.22);
   --line-strong: rgba(244, 244, 244, 0.45);
 
   /* —— 缓动 / 时长 —— */
-  --ease-enter:  cubic-bezier(.2, .8, .2, 1);
-  --ease-exit:   cubic-bezier(.4, 0, 1, 1);
-  --d-base:      600ms;  /* 渐显入场基础时长（用于子元素错峰） */
-  --d-hero:      900ms;
+  --ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --d-base: 600ms; /* 渐显入场基础时长（用于子元素错峰） */
+  --d-hero: 900ms;
 
   position: fixed;
   inset: 0;
@@ -174,7 +168,12 @@ onBeforeUnmount(() => {
   overflow: hidden;
   background: var(--bg);
   color: var(--fg);
-  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
   will-change: opacity, filter, transform;
 }
 
@@ -211,8 +210,14 @@ onBeforeUnmount(() => {
   animation: rings-in var(--d-hero) var(--ease-enter) both;
 }
 @keyframes rings-in {
-  from { opacity: 0; transform: scale(0.92); }
-  to   { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .ring {
@@ -255,12 +260,27 @@ onBeforeUnmount(() => {
   animation: tick 2.2s var(--ease-enter) infinite;
 }
 @keyframes tick {
-  0%, 100% { transform: translateX(-50%) rotate(0deg); opacity: 0.45; }
-  50%      { transform: translateX(-50%) rotate(180deg); opacity: 0.95; }
+  0%,
+  100% {
+    transform: translateX(-50%) rotate(0deg);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translateX(-50%) rotate(180deg);
+    opacity: 0.95;
+  }
 }
 
-@keyframes spin { to { transform: rotate(360deg); } }
-@keyframes spin-rev { to { transform: rotate(-360deg); } }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes spin-rev {
+  to {
+    transform: rotate(-360deg);
+  }
+}
 
 .brand {
   text-align: center;
@@ -327,8 +347,14 @@ onBeforeUnmount(() => {
 }
 
 @keyframes fade-up {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* 渐显入场：纯透明度过渡，600ms 自然流畅 */
@@ -341,9 +367,10 @@ onBeforeUnmount(() => {
 
 /* 渐隐退场：透明度 + 模糊 + 轻微位移 */
 .overlay-leave-active {
-  transition: opacity 620ms var(--ease-exit),
-              filter 620ms var(--ease-exit),
-              transform 620ms var(--ease-exit);
+  transition:
+    opacity 620ms var(--ease-exit),
+    filter 620ms var(--ease-exit),
+    transform 620ms var(--ease-exit);
 }
 .overlay-leave-to {
   opacity: 0;
@@ -356,12 +383,23 @@ onBeforeUnmount(() => {
   .rings,
   .brand,
   .status-line,
-  .track { animation: none; }
+  .track {
+    animation: none;
+  }
   .ring,
-  .tickmark { animation: none !important; }
-  .ring--outer { border-color: var(--fg) transparent transparent transparent; }
+  .tickmark {
+    animation: none !important;
+  }
+  .ring--outer {
+    border-color: var(--fg) transparent transparent transparent;
+  }
   .overlay-enter-active,
-  .overlay-leave-active { transition: opacity 200ms linear; }
-  .overlay-leave-to { filter: none; transform: none; }
+  .overlay-leave-active {
+    transition: opacity 200ms linear;
+  }
+  .overlay-leave-to {
+    filter: none;
+    transform: none;
+  }
 }
 </style>

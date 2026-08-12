@@ -156,7 +156,7 @@ export const useProjectStore = defineStore('project', () => {
     recentProjects.value = [
       item,
       ...recentProjects.value.filter(
-        existing =>
+        (existing) =>
           existing.id !== item.id &&
           (existing.title !== item.title || existing.projectPath !== item.projectPath),
       ),

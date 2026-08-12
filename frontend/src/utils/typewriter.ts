@@ -50,7 +50,7 @@ export function createTypewriter(apply: (text: string) => void): Typewriter {
     finish() {
       finished = true
       if (!buffer && rafId === null) return Promise.resolve()
-      return new Promise<void>(resolve => {
+      return new Promise<void>((resolve) => {
         resolveFinish = resolve
         schedule()
       })
