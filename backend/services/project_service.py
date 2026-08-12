@@ -26,6 +26,8 @@ def init_projects_table() -> None:
         )
         """
     )
+    # 最近项目列表按 WHERE user_id=? 过滤（C7）；DDL 住在 service 层是 C9 的债，待迁移时一并收拢
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id)")
     conn.commit()
     conn.close()
 
