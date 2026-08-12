@@ -1,10 +1,10 @@
 import axios from 'axios'
-import { TOKEN_KEY } from '@/constants'
+import { API_BASE, TOKEN_KEY } from '@/constants'
 import { ElMessage } from '@/utils/toast'
 import { useUserStore } from '@/stores/user'
 
 const request = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE,
   timeout: 30000,
 })
 

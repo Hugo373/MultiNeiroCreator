@@ -1,11 +1,14 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
-export default defineConfig({
+// 以函数形式拿到当前 mode，用 loadEnv 读 .env.* 里的代理目标（F6：不再硬编码后端地址）
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, __dirname, '')
+  return {
   plugins: [
     vue(),
     AutoImport({
@@ -41,10 +44,11 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        target: env.VITE_PROXY_TARGET || 'http://127.0.0.1:8000',
         changeOrigin: true,
         rewrite: path => path.replace(/^\/api/, ''),
       },
     },
   },
+  }
 })
