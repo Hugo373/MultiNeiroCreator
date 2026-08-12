@@ -6,7 +6,7 @@ import skipFormatting from '@vue/eslint-config-prettier/skip-formatting'
 
 export default defineConfigWithVueTs(
   { files: ['**/*.{ts,mts,tsx,vue}'] },
-  { ignores: ['dist/**', 'node_modules/**', 'auto-imports.d.ts', 'components.d.ts'] },
+  { ignores: ['dist/**', 'node_modules/**', 'src/types/auto-imports.d.ts', 'src/types/components.d.ts'] },
 
   // vue 推荐规则（含 essential 的错误级 + 强烈推荐的最佳实践）
   pluginVue.configs['flat/recommended'],
