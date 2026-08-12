@@ -1,4 +1,6 @@
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 from core.config import DB_FILE
 
@@ -18,6 +20,23 @@ def get_connection() -> sqlite3.Connection:
     # 当前表还没声明 FOREIGN KEY（补声明需重建表，归 C9 迁移），先把开关打开保证声明后即刻生效
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
+
+
+@contextmanager
+def db_connection() -> Iterator[sqlite3.Connection]:
+    """数据库连接的唯一推荐入口（C8）：事务 + 关闭双重保障。
+
+    内层 `with conn` 管事务：正常退出自动 commit，抛异常自动 rollback；
+    外层 finally 管生命周期：无论成败/异常必定 close。
+    注意 sqlite3 的坑：`with conn` 只管 commit/rollback，**不会** close，
+    所以必须两层包裹，缺外层就是连接泄漏。
+    """
+    conn = get_connection()
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def init_db() -> None:
