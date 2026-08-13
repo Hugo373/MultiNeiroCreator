@@ -261,8 +261,7 @@ async def _stream_chat_impl(
     profile = load_profile(user["id"])
     system_prompt = build_system_prompt(profile, context)
 
-    # 对话历史以服务端数据库为唯一真源，不信任客户端传来的内容（防伪造上下文注入）。
-    # 条数上限先做粗粒度兜底，按 token 精确截断是 G3 的事。
+    # 对话历史以服务端数据库为唯一真源，不信任客户端传来的内容（防伪造上下文注入）
     history = list_history(user["id"], project_id)[-config.CHAT_HISTORY_MAX_ITEMS:]
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -352,8 +351,7 @@ async def _stream_chat_impl(
             )
         else:
             try:
-                # 工具都是同步函数（如联网搜索可阻塞 5s+），必须丢线程池，
-                # 否则阻塞事件循环、拖死其他用户的 SSE（同 solved.md #18 的根因）
+                # 同步工具（如联网搜索可阻塞 5s+）必须丢线程池，否则阻塞事件循环拖死其他用户的 SSE
                 result = await asyncio.to_thread(tools_map[func_name].invoke, func_args)
                 logger.info(
                     "工具调用完成",

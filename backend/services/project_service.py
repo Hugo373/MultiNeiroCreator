@@ -3,9 +3,8 @@ from datetime import UTC, datetime
 
 from core.database import db_connection
 
-# 工程文件一律由前端通过 File System Access API 写入用户本地磁盘，
-# 后端只维护"项目名 + id"这张花名册，用于最近项目列表和聊天记录按项目隔离。
-# project_path 字段仅保存本地文件夹名作展示标签，后端不做任何文件操作。
+# 工程文件由前端写入用户本地磁盘，后端只维护项目花名册；
+# project_path 仅作展示标签，后端不做任何文件操作。
 
 
 def init_projects_table() -> None:
@@ -24,7 +23,6 @@ def init_projects_table() -> None:
         )
         """
         )
-        # 最近项目列表按 WHERE user_id=? 过滤（C7）；DDL 住在 service 层是 C9 的债，待迁移时一并收拢
         conn.execute("CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id)")
 
 
@@ -69,7 +67,7 @@ def get_project(user_id: int, project_id: int) -> dict | None:
 def create_project(user_id: int, name: str | None = None, project_path: str | None = None) -> dict:
     init_projects_table()
 
-    # 项目名和时间戳按本地时间展示给用户；先取带时区的 UTC 再转本地，避免 naive datetime（DTZ005）
+    # 先取带时区的 UTC 再转本地，避免 naive datetime
     now = datetime.now(UTC).astimezone()
     timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
     project_name = _normalize_project_name(name, now)

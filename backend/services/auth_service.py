@@ -16,9 +16,7 @@ CODE_MAX_ATTEMPTS = 5
 
 logger = logging.getLogger("auth")
 
-# 验证码存 Redis（替代原进程内 _codes dict，多 worker/重启后依然有效）。
-# 这里用同步客户端：register 是 sync 路由（bcrypt 在线程池里跑，不阻塞事件循环），
-# 且单次 Redis 操作是亚毫秒级，即使在 async 的 send_code 里调用也可忽略。
+# 验证码存 Redis（多 worker/重启后依然有效）；同步客户端即可，单次操作亚毫秒级
 _redis = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
 
@@ -77,8 +75,7 @@ async def send_code(username: str) -> dict:
     msg["From"] = MAIL_USER
     msg["To"] = username
 
-    # 465 端口是隐式 TLS（连接即握手），587 端口是明文连接后 STARTTLS 升级，
-    # 两者不能混用，否则报 SSL: WRONG_VERSION_NUMBER
+    # 465 = 隐式 TLS，587 = STARTTLS，混用会报 SSL: WRONG_VERSION_NUMBER
     implicit_tls = MAIL_PORT == 465
     try:
         await aiosmtplib.send(
@@ -91,7 +88,7 @@ async def send_code(username: str) -> dict:
             start_tls=not implicit_tls,
         )
     except Exception as exc:
-        # 完整错误只进日志：SMTP 异常文本可能含主机/账号等内部信息，不能回给客户端
+        # SMTP 异常文本可能含主机/账号信息，只进日志不回客户端
         logger.exception(
             "验证码邮件发送失败: %s", type(exc).__name__,
             extra={"evt": "mail_send_error", "error_type": type(exc).__name__},
@@ -113,8 +110,7 @@ def register(username: str, password: str, code: str) -> dict:
     return {"token": token, "username": username}
 
 
-# 账号不存在时也跑一次 bcrypt 校验（对着这个假哈希），让两种失败耗时一致，
-# 防止通过响应时间差枚举"哪些邮箱注册过"（时序侧信道）
+# 账号不存在时也跑一次 bcrypt，让两种失败耗时一致，防时序侧信道枚举已注册邮箱
 _DUMMY_HASH = hash_password("timing-equalizer")
 
 

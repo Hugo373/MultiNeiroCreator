@@ -52,14 +52,10 @@ CODE_SEND_PER_IP_PER_DAY = int(os.getenv("CODE_SEND_PER_IP_PER_DAY", "20"))
 UPLOAD_MAX_FILE_MB = int(os.getenv("UPLOAD_MAX_FILE_MB", "30"))
 UPLOAD_DAILY_TOTAL_MB = int(os.getenv("UPLOAD_DAILY_TOTAL_MB", "100"))
 
-# ===== 请求体大小限制（core/bodylimit.py 使用）=====
-# 全局上限要大于上传单文件上限（30MB + multipart 编码开销），否则合法上传会被中间件先拦掉
+# 全局请求体上限须大于上传单文件上限（30MB + multipart 编码开销）
 BODY_MAX_MB = int(os.getenv("BODY_MAX_MB", "32"))
 
-# ===== 聊天/资料字段级上限 =====
-# 全局字节上限管的是"传输层"，这里管的是"业务层"：1MB 的 body 过得了全局限制，
-# 但作为单条聊天消息仍然不合理。历史条数上限用于服务端重建上下文时的粗粒度兜底（A5），
-# 按 token 精确截断是 G3 的事。
+# 字段级上限（业务层）：1MB 的 body 过得了全局限制，但作为单条消息仍不合理
 CHAT_MESSAGE_MAX_CHARS = int(os.getenv("CHAT_MESSAGE_MAX_CHARS", "20000"))
 CHAT_HISTORY_MAX_ITEMS = int(os.getenv("CHAT_HISTORY_MAX_ITEMS", "200"))
 CHAT_ATTACHMENTS_MAX_ITEMS = int(os.getenv("CHAT_ATTACHMENTS_MAX_ITEMS", "20"))
