@@ -5,15 +5,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.bodylimit import BodySizeLimitMiddleware
 from core.config import APP_ENV, CORS_ORIGINS, IS_PRODUCTION, REDIS_URL
-from core.database import init_db
 from core.exceptions import register_exception_handlers
 from core.logging_config import setup_logging
+from core.migrations import run_migrations
 from core.ratelimit import redis_client
 from core.request_context import RequestContextMiddleware
 from routers.assistant import router as assistant_router
 from routers.auth import router as auth_router
 from routers.projects import router as projects_router
-from services.project_service import init_projects_table
 
 setup_logging()
 logger = logging.getLogger("main")
@@ -52,8 +51,7 @@ def health() -> dict:
 @app.on_event("startup")
 async def bootstrap() -> None:
     logger.info("服务启动", extra={"evt": "startup", "env": APP_ENV})
-    init_db()
-    init_projects_table()
+    run_migrations()
     try:
         await redis_client.ping()
     except Exception as exc:

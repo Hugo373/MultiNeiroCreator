@@ -5,25 +5,7 @@ from core.database import db_connection
 
 # 工程文件由前端写入用户本地磁盘，后端只维护项目花名册；
 # project_path 仅作展示标签，后端不做任何文件操作。
-
-
-def init_projects_table() -> None:
-    with db_connection() as conn:
-        conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS projects (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            name TEXT NOT NULL,
-            project_path TEXT NOT NULL,
-            save_mode TEXT DEFAULT 'manual',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            last_opened_at TEXT NOT NULL
-        )
-        """
-        )
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id)")
+# 建表/索引统一由 core/migrations.py 在启动时完成（C9）。
 
 
 def list_recent_projects(user_id: int, limit: int = 8) -> list[dict]:
@@ -44,8 +26,6 @@ def list_recent_projects(user_id: int, limit: int = 8) -> list[dict]:
 
 
 def get_project(user_id: int, project_id: int) -> dict | None:
-    init_projects_table()
-
     with db_connection() as conn:
         conn.row_factory = sqlite3.Row
         row = conn.execute(
@@ -65,8 +45,6 @@ def get_project(user_id: int, project_id: int) -> dict | None:
 
 
 def create_project(user_id: int, name: str | None = None, project_path: str | None = None) -> dict:
-    init_projects_table()
-
     # 先取带时区的 UTC 再转本地，避免 naive datetime
     now = datetime.now(UTC).astimezone()
     timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
