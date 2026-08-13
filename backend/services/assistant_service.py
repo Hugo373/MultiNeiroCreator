@@ -258,11 +258,15 @@ async def _stream_chat_impl(
         )
         context = ""
 
-    profile = load_profile(user["id"])
+    # 同步 DB 读也丢线程池：SSE 生成器里任何同步调用都在占用事件循环（C1）
+    profile, full_history = await asyncio.gather(
+        asyncio.to_thread(load_profile, user["id"]),
+        asyncio.to_thread(list_history, user["id"], project_id),
+    )
     system_prompt = build_system_prompt(profile, context)
 
     # 对话历史以服务端数据库为唯一真源，不信任客户端传来的内容（防伪造上下文注入）
-    history = list_history(user["id"], project_id)[-config.CHAT_HISTORY_MAX_ITEMS:]
+    history = full_history[-config.CHAT_HISTORY_MAX_ITEMS:]
 
     messages = [{"role": "system", "content": system_prompt}]
     clean_history: list[dict] = []
@@ -403,8 +407,11 @@ async def _stream_chat_impl(
     messages.append({"role": "assistant", "content": reply})
     if not (message or "").strip():
         current_user_history_item["content"] = display_message
-    append_message(user["id"], "user", current_user_history_item["content"], project_id, normalized_attachments)
-    append_message(user["id"], "assistant", reply, project_id)
+    await asyncio.to_thread(
+        append_message,
+        user["id"], "user", current_user_history_item["content"], project_id, normalized_attachments,
+    )
+    await asyncio.to_thread(append_message, user["id"], "assistant", reply, project_id)
     clean_history.append({"role": "assistant", "content": reply})
     now = time.perf_counter()
     logger.info(

@@ -38,13 +38,18 @@ def get_profile_route(user=Depends(verify_token)):
     return {"profile": load_profile(user["id"])}
 
 
+# 以下同步路由故意声明为 def（非 async）：FastAPI 会把它们丢进线程池执行，
+# 同步 DB/chroma/embedding 调用不再阻塞事件循环（C1）。写成 async def 却内部
+# 全是同步调用，才是之前拖死全站的写法。
+
+
 @router.get("/history")
-async def get_history_route(project_id: int | None = None, user=Depends(verify_token)):
+def get_history_route(project_id: int | None = None, user=Depends(verify_token)):
     return get_history(user["id"], project_id)
 
 
 @router.delete("/history")
-async def clear_history_route(project_id: int | None = None, user=Depends(verify_token)):
+def clear_history_route(project_id: int | None = None, user=Depends(verify_token)):
     return clear_history(user["id"], project_id)
 
 
@@ -63,17 +68,17 @@ async def upload_file(
 
 
 @router.get("/documents")
-async def list_rag_documents_route(project_id: int | None = None, user=Depends(verify_token)):
+def list_rag_documents_route(project_id: int | None = None, user=Depends(verify_token)):
     return get_rag_documents(user["id"], project_id)
 
 
 @router.delete("/documents")
-async def delete_rag_document_route(req: RagDocumentDeleteRequest, user=Depends(verify_token)):
+def delete_rag_document_route(req: RagDocumentDeleteRequest, user=Depends(verify_token)):
     return remove_rag_document(req.filename, user["id"], req.project_id)
 
 
 @router.post("/documents/reindex")
-async def reindex_rag_document_route(
+def reindex_rag_document_route(
     filename: str = Query(..., min_length=1, max_length=255),
     project_id: int | None = Query(None),
     user=Depends(verify_token),
