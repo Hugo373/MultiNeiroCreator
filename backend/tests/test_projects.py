@@ -20,13 +20,13 @@ def test_get_project_returns_owner_project(tmp_path, monkeypatch):
 
     created = project_service.create_project(owner_id, "Alpha", "Folder Alpha")
 
-    loaded = project_service.get_project(owner_id, created["id"])
+    loaded = project_service.get_project(owner_id, created.id)
     assert loaded is not None
-    assert loaded["id"] == created["id"]
-    assert loaded["name"] == "Alpha"
-    assert loaded["project_path"] == "Folder Alpha"
+    assert loaded.id == created.id
+    assert loaded.name == "Alpha"
+    assert loaded.project_path == "Folder Alpha"
 
-    assert project_service.get_project(other_id, created["id"]) is None
+    assert project_service.get_project(other_id, created.id) is None
 
 
 def test_migrations_idempotent_and_fk_enforced(tmp_path, monkeypatch):

@@ -1,5 +1,20 @@
-
 from pydantic import BaseModel, Field
+
+
+class Project(BaseModel):
+    """Project 的唯一业务定义（C5）：repo 行 → 本模型 → API 响应全链路同一形状。
+
+    表结构（DDL）住在 core/migrations.py；这里是代码世界里 Project 长什么样的唯一答案，
+    不再有手搓 dict 的第三种形状。
+    """
+
+    id: int
+    name: str
+    project_path: str
+    save_mode: str = "manual"
+    created_at: str
+    updated_at: str
+    last_opened_at: str
 
 
 class CreateProjectRequest(BaseModel):
