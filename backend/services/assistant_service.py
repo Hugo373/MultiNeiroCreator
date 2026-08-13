@@ -9,11 +9,12 @@ from collections.abc import AsyncGenerator
 from fastapi import HTTPException, UploadFile
 from starlette.concurrency import iterate_in_threadpool
 
-from agents.neyria import build_system_prompt, client, tools_map, tools_schema
+from agents.neyria import build_system_prompt, client, tools_schema
 from core import config
 from repositories.chat_repo import append_message, list_history
 from repositories.chat_repo import clear_history as repo_clear_history
 from repositories.user_repo import get_profile, update_profile
+from services.chat.tool_executor import execute_tool
 from services.rag import (
     delete_document,
     get_document_chunks,
@@ -26,23 +27,9 @@ from services.rag import (
 MAX_ATTACHMENT_CONTEXT_CHARS = 12000
 MAX_RETRIEVED_CONTEXT_CHARS = 6000
 
-MAX_TOOL_ARG_LENGTH = 500
-
 CHAT_MODEL = "glm-4-flash"  # E4 会把模型名收进 config，先收敛到单一常量
 
 logger = logging.getLogger("assistant")
-
-
-def validate_tool_call(func_name: str, func_args: dict) -> str | None:
-    """校验模型返回的工具调用，返回错误信息；合法时返回 None。"""
-    if func_name not in tools_map:
-        return f"不支持的工具: {func_name}"
-    if not isinstance(func_args, dict):
-        return "工具参数格式错误"
-    for value in func_args.values():
-        if isinstance(value, str) and len(value) > MAX_TOOL_ARG_LENGTH:
-            return "工具参数过长"
-    return None
 
 
 def load_profile(user_id: int) -> str:
@@ -338,45 +325,10 @@ async def _stream_chat_impl(
             yield f"data: {json.dumps({'type': 'content', 'content': content}, ensure_ascii=False)}\n\n"
 
     if func_name:
-        try:
-            func_args = json.loads(func_args_raw)
-        except (json.JSONDecodeError, TypeError):
-            func_args = None
-        validation_error = (
-            "工具参数解析失败" if func_args is None else validate_tool_call(func_name, func_args)
-        )
         yield f"data: {json.dumps({'type': 'tool', 'tool_name': func_name}, ensure_ascii=False)}\n\n"
-        tool_started = time.perf_counter()
-        if validation_error:
-            result = f"工具调用被拒绝：{validation_error}"
-            logger.warning(
-                "工具调用被拒绝: %s", validation_error,
-                extra={"evt": "tool_rejected", "tool": func_name, "reason": validation_error},
-            )
-        else:
-            try:
-                # 同步工具（如联网搜索可阻塞 5s+）必须丢线程池，否则阻塞事件循环拖死其他用户的 SSE
-                result = await asyncio.to_thread(tools_map[func_name].invoke, func_args)
-                logger.info(
-                    "工具调用完成",
-                    extra={
-                        "evt": "tool_call",
-                        "tool": func_name,
-                        "duration_ms": round((time.perf_counter() - tool_started) * 1000, 1),
-                        "result_chars": len(str(result)),
-                    },
-                )
-            except Exception as exc:
-                logger.exception(
-                    "工具执行失败: %s", type(exc).__name__,
-                    extra={
-                        "evt": "tool_error",
-                        "tool": func_name,
-                        "error_type": type(exc).__name__,
-                        "duration_ms": round((time.perf_counter() - tool_started) * 1000, 1),
-                    },
-                )
-                result = "工具执行失败，请换个方式提问或稍后重试。"
+        # 跑腿的绝不抛异常：成功/被拒/失败都是一张结果单，这里不分叉
+        outcome = await execute_tool(func_name, func_args_raw)
+        result = outcome.result
         messages.append(
             {
                 "role": "assistant",
