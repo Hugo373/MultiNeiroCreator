@@ -9,7 +9,7 @@ logger = logging.getLogger("tools.current_time")
 
 @tool
 def get_current_time() -> str:
-    """获取当前最新的北京时间以及全球主要城市的精准当地时间"""
+    """获取当前最新的北京时间以及全球主要城市的精准当地时间，当用户询问时间、日期或今天星期几时调用"""
     try:
         regions = {
             "中国 (北京)": "Asia/Shanghai",

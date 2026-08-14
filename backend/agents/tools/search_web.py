@@ -6,9 +6,13 @@ from langchain_core.tools import tool
 logger = logging.getLogger("tools.search_web")
 
 
-@tool
+@tool(parse_docstring=True)
 def search_web(query: str) -> str:
-    """搜索网络获取实时信息，适合查询新闻、天气、最新事件等"""
+    """搜索网络获取实时信息，适合查询新闻、天气、最新事件等。
+
+    Args:
+        query: 搜索关键词
+    """
     news_keywords = [
         "新闻",
         "动态",

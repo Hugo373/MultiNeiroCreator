@@ -68,7 +68,7 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.File", "f
 [tool.mypy]
 python_version = "3.12"
 # 按 todo §4.2：先覆盖 core/schemas/services.rag，不第一天追求全仓零错误
-files = ["core", "schemas", "services/rag"]
+files = ["core", "schemas", "services/rag", "services/chat"]
 # 项目非包安装且各目录无 __init__.py（命名空间包）：显式告诉 mypy 以 backend/ 为包根，
 # 否则 core/config.py 会被同时解析成 config 和 core.config 两个模块名而报错
 explicit_package_bases = true

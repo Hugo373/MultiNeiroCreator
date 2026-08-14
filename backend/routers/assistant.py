@@ -12,9 +12,9 @@ from services.assistant_service import (
     rebuild_rag_document,
     remove_rag_document,
     save_profile,
-    stream_chat,
     upload_document,
 )
+from services.chat.chat_orchestrator import stream_chat
 
 router = APIRouter(tags=["assistant"])
 

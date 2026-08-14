@@ -1,52 +1,8 @@
 from zhipuai import ZhipuAI
 
-from agents.tools.calculator import calculate
-from agents.tools.current_time import get_current_time
-from agents.tools.search_web import search_web
 from core.config import API_KEY
 
 client = ZhipuAI(api_key=API_KEY) if API_KEY else None
-
-tools_schema = [
-    {
-        "type": "function",
-        "function": {
-            "name": "calculate",
-            "description": "计算数学表达式",
-            "parameters": {
-                "type": "object",
-                "properties": {"expression": {"type": "string"}},
-                "required": ["expression"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_current_time",
-            "description": "获取当前最新的北京时间，当用户询问时间、日期或今天星期几时调用。",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "search_web",
-            "description": "搜索网络获取实时信息，适合查询新闻、天气、最新事件等",
-            "parameters": {
-                "type": "object",
-                "properties": {"query": {"type": "string", "description": "搜索关键词"}},
-                "required": ["query"],
-            },
-        },
-    },
-]
-
-tools_map = {
-    "calculate": calculate,
-    "get_current_time": get_current_time,
-    "search_web": search_web,
-}
 
 
 def build_system_prompt(profile: str, context: str) -> str:

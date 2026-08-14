@@ -11,7 +11,7 @@ import logging
 import time
 from dataclasses import dataclass
 
-from agents.neyria import tools_map
+from agents.tools.registry import tools_map
 
 logger = logging.getLogger("assistant")
 
