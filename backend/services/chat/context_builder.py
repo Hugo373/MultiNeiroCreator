@@ -34,6 +34,7 @@ class ChatContext:
     clean_history: list[dict]  # 回前端：done 事件里的干净历史（含本条用户消息）
     persist_text: str  # 持久化用的用户消息文本（空消息回落"已发送附件"）
     attachments: list[dict]  # 规范化后的本条附件
+    has_knowledge_context: bool = False  # 是否检索到可供模型使用的私有资料
 
 
 def normalize_attachments(attachments: list[dict] | None) -> list[dict]:
@@ -211,4 +212,5 @@ async def build_chat_context(
         clean_history=clean_history,
         persist_text=persist_text,
         attachments=normalize_attachments(attachments),
+        has_knowledge_context=bool(context),
     )

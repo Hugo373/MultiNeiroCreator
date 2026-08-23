@@ -1,8 +1,8 @@
 import chromadb
 
-from core.config import BACKEND_DIR
+from core.config import BACKEND_DIR, RAG_COLLECTION_NAME
 
-DEFAULT_COLLECTION_NAME = "documents"
+DEFAULT_COLLECTION_NAME = RAG_COLLECTION_NAME
 
 
 class VectorStore:

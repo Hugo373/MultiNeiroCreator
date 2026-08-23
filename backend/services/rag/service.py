@@ -1,3 +1,4 @@
+from core.config import RAG_DISTANCE_THRESHOLD
 from services.rag.embedding import get_embedding, get_embeddings_batch
 from services.rag.parser import chunk_text, read_file
 from services.rag.retriever import (
@@ -72,6 +73,7 @@ def search(
         user_id=user_id,
         project_id=project_id,
         scope=scope,
+        max_distance=RAG_DISTANCE_THRESHOLD,
     )
 
 

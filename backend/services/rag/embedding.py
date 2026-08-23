@@ -1,38 +1,67 @@
 import logging
 import time
+from typing import Any
 
-from google import genai
+import httpx
 
-from core.config import EMBEDDING_API_KEY
+from core.config import EMBEDDING_API_URL, EMBEDDING_MODEL, SILICONFLOW_API_KEY
 
 logger = logging.getLogger("rag.embedding")
 
-EMBEDDING_MODEL = "gemini-embedding-001"
 
-client_ai = (
-    genai.Client(api_key=EMBEDDING_API_KEY)
-    if EMBEDDING_API_KEY
-    else None
-)
-
-
-def _extract_vector(result, context: str) -> list[float]:
-    """从 SDK 响应中取出向量，SDK 类型上 embeddings/values 都是 Optional，做显式防御。"""
-    if not result.embeddings or result.embeddings[0].values is None:
+def _extract_vectors(payload: dict[str, Any], context: str) -> list[list[float]]:
+    """从 SiliconFlow OpenAI 兼容响应中提取向量，并校验结构。"""
+    data = payload.get("data")
+    if not isinstance(data, list) or not data:
         raise RuntimeError(f"{context}：embedding API 返回了空结果")
-    return list(result.embeddings[0].values)
+
+    ordered_data = sorted(
+        data,
+        key=lambda item: item.get("index", 0) if isinstance(item, dict) else 0,
+    )
+    vectors: list[list[float]] = []
+    for item in ordered_data:
+        if not isinstance(item, dict) or not isinstance(item.get("embedding"), list):
+            raise RuntimeError(f"{context}：embedding API 返回了无效向量")
+        vectors.append(item["embedding"])
+    return vectors
+
+
+def _embed(inputs: str | list[str], context: str) -> list[list[float]]:
+    if not SILICONFLOW_API_KEY:
+        raise RuntimeError("未配置 SILICONFLOW_API_KEY，RAG 向量检索暂不可用")
+
+    try:
+        response = httpx.post(
+            EMBEDDING_API_URL,
+            headers={
+                "Authorization": f"Bearer {SILICONFLOW_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={"model": EMBEDDING_MODEL, "input": inputs},
+            timeout=60.0,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise RuntimeError(f"{context}：embedding API 返回了无效 JSON")
+        return _extract_vectors(payload, context)
+    except httpx.HTTPStatusError as exc:
+        # 只把状态码和服务商返回的错误文本交给上层，不记录 API key。
+        detail = exc.response.text[:500]
+        raise RuntimeError(
+            f"{context}失败（SiliconFlow HTTP {exc.response.status_code}）：{detail}"
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"{context}失败：无法连接 SiliconFlow embedding 服务") from exc
 
 
 def get_embedding(text: str) -> list[float]:
-    if client_ai is None:
-        raise RuntimeError("未配置 API_KEY，RAG 向量检索暂不可用")
-
     started = time.perf_counter()
     try:
-        result = client_ai.models.embed_content(
-            model=EMBEDDING_MODEL,
-            contents=text,
-        )
+        vectors = _embed(text, "查询向量化")
+        if len(vectors) != 1:
+            raise RuntimeError(f"查询向量化：API 返回了 {len(vectors)} 个向量，预期 1 个")
     except Exception as exc:
         logger.error(
             "查询向量化失败: %s", type(exc).__name__,
@@ -40,43 +69,40 @@ def get_embedding(text: str) -> list[float]:
                    "text_chars": len(text)},
         )
         raise
+
     logger.info(
         "查询向量化完成",
-        extra={"evt": "embed_query", "model": EMBEDDING_MODEL, "text_chars": len(text),
+        extra={"evt": "embed_query", "provider": "siliconflow", "model": EMBEDDING_MODEL,
+               "text_chars": len(text),
                "duration_ms": round((time.perf_counter() - started) * 1000, 1)},
     )
-    return _extract_vector(result, "查询向量化")
+    return vectors[0]
 
 
 def get_embeddings_batch(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
 
-    if client_ai is None:
-        raise RuntimeError("未配置 API_KEY，文档向量化暂不可用")
-
     started = time.perf_counter()
-    embeddings: list[list[float]] = []
-
-    # 串行逐条调用是已知性能债（G1），这里先把耗时记下来，压测时好对比优化前后
-    for index, text in enumerate(texts):
-        try:
-            result = client_ai.models.embed_content(
-                model=EMBEDDING_MODEL,
-                contents=text,
+    try:
+        # BAAI/bge-m3 支持 input=list[str]，一次请求生成多个文档块向量。
+        embeddings = _embed(texts, "批量向量化")
+        if len(embeddings) != len(texts):
+            raise RuntimeError(
+                f"批量向量化：API 返回了 {len(embeddings)} 个向量，预期 {len(texts)} 个"
             )
-        except Exception as exc:
-            logger.error(
-                "批量向量化失败: %s", type(exc).__name__,
-                extra={"evt": "embed_batch_error", "error_type": type(exc).__name__,
-                       "failed_index": index, "total_chunks": len(texts)},
-            )
-            raise
-        embeddings.append(_extract_vector(result, f"批量向量化(第 {index + 1}/{len(texts)} 条)"))
+    except Exception as exc:
+        logger.error(
+            "批量向量化失败: %s", type(exc).__name__,
+            extra={"evt": "embed_batch_error", "error_type": type(exc).__name__,
+                   "total_chunks": len(texts)},
+        )
+        raise
 
     logger.info(
         "批量向量化完成",
-        extra={"evt": "embed_batch", "model": EMBEDDING_MODEL, "chunks": len(texts),
+        extra={"evt": "embed_batch", "provider": "siliconflow", "model": EMBEDDING_MODEL,
+               "chunks": len(texts),
                "duration_ms": round((time.perf_counter() - started) * 1000, 1)},
     )
     return embeddings

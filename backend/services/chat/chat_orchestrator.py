@@ -21,7 +21,7 @@ from fastapi import HTTPException
 from starlette.concurrency import iterate_in_threadpool
 
 from agents.neyria import client
-from agents.tools.registry import tools_schema
+from agents.tools.registry import tools_map, tools_schema
 from repositories.chat_repo import append_message
 from services.chat.context_builder import build_chat_context
 from services.chat.tool_executor import execute_tool
@@ -33,8 +33,61 @@ MAX_TOOL_CALLS_PER_ROUND = 5  # 单轮最多执行的工具调用数
 
 TOOL_LIMIT_NOTICE = "已达到本次对话的工具调用轮数上限，请基于已获得的信息直接给出最终回答，不要再请求任何工具。"
 TOOL_SKIPPED_RESULT = "已超出单轮工具调用数量上限，本次调用未执行。请基于已有结果回答。"
+WEB_SEARCH_TOOL_NAME = "search_web"
+TEXT_TOOL_CALL_MAX_LENGTH = 1200
 
 logger = logging.getLogger("assistant")
+
+
+def parse_textual_tool_call(text: str) -> tuple[str, str] | None:
+    """识别模型偶尔输出的旧式文本工具调用，不把它直接展示给用户。
+
+    智谱的标准响应是 ``delta.tool_calls``，但某些模型/兼容层会把调用写成
+    ``search_web {"query": "..."}``。这不是正常回答，必须转换回编排器的
+    结构化路径；解析失败时返回 None，普通文本仍按原样流出。
+    """
+    candidate = text.strip()
+    if not candidate or len(candidate) > TEXT_TOOL_CALL_MAX_LENGTH:
+        return None
+
+    for tool_name in sorted(tools_map, key=len, reverse=True):
+        if not candidate.startswith(tool_name):
+            continue
+        rest = candidate[len(tool_name):].lstrip()
+        if not rest.startswith("{"):
+            continue
+        try:
+            arguments, end = json.JSONDecoder().raw_decode(rest)
+        except json.JSONDecodeError:
+            continue
+        trailing = rest[end:].strip().removeprefix("```").strip()
+        if trailing or not isinstance(arguments, dict):
+            continue
+        return tool_name, json.dumps(arguments, ensure_ascii=False)
+    return None
+
+
+def _could_be_textual_tool_call_prefix(text: str) -> bool:
+    """判断尚未完整到达的文本是否仍可能是工具调用。"""
+    candidate = text.lstrip()
+    if not candidate or len(candidate) > TEXT_TOOL_CALL_MAX_LENGTH:
+        return False
+    return any(tool_name.startswith(candidate) or candidate.startswith(tool_name) for tool_name in tools_map)
+
+
+def _tools_for_context(has_knowledge_context: bool) -> list[dict]:
+    """有私有资料时锁住联网工具；无命中时只保留计算和联网后备。"""
+    if has_knowledge_context:
+        return [
+            tool
+            for tool in tools_schema
+            if tool.get("function", {}).get("name") != WEB_SEARCH_TOOL_NAME
+        ]
+    return [
+        tool
+        for tool in tools_schema
+        if tool.get("function", {}).get("name") != "get_current_time"
+    ]
 
 
 def extract_stream_content(chunk) -> str:
@@ -113,6 +166,8 @@ async def _orchestrate(
     ctx = await build_chat_context(user["id"], message, project_id, attachments)
     messages = ctx.messages
 
+    available_tools = _tools_for_context(ctx.has_knowledge_context)
+
     reply = ""
     tools_used: list[str] = []
     tool_rounds = 0
@@ -128,26 +183,53 @@ async def _orchestrate(
 
         request_kwargs: dict = {"model": CHAT_MODEL, "messages": messages, "stream": True}
         if allow_tools:
-            request_kwargs["tools"] = tools_schema
+            request_kwargs["tools"] = available_tools
         stream = await asyncio.to_thread(client.chat.completions.create, **request_kwargs)
 
         pending_tool_calls: dict[int, dict] = {}
-        # 上游流必须在线程池里迭代：同步 for 会阻塞事件循环，uvloop 下已 write 的
-        # 字节要等循环空闲才刷出 socket，SSE 会退化成"生成完一次性吐出"
+        textual_tool_candidate = ""
+        # 兼容少数模型/代理把 function calling 错误降级成普通文本的情况。
+        # 只暂存“像工具名开头”的前缀，普通回答仍逐 chunk 流出。
         async for chunk in iterate_in_threadpool(stream):
             if not chunk.choices:
                 continue
             delta = chunk.choices[0].delta
             delta_calls = getattr(delta, "tool_calls", None)
             if delta_calls:
+                if textual_tool_candidate:
+                    fallback_call = parse_textual_tool_call(textual_tool_candidate)
+                    if not fallback_call:
+                        reply += textual_tool_candidate
+                        yield _sse({"type": "content", "content": textual_tool_candidate})
+                    textual_tool_candidate = ""
                 merge_tool_call_delta(pending_tool_calls, delta_calls)
                 continue
             content = extract_stream_content(chunk)
             if content:
+                if textual_tool_candidate:
+                    textual_tool_candidate += content
+                elif _could_be_textual_tool_call_prefix(content):
+                    textual_tool_candidate = content
+                else:
+                    if first_token_at is None:
+                        first_token_at = time.perf_counter()
+                    reply += content
+                    yield _sse({"type": "content", "content": content})
+
+        if textual_tool_candidate:
+            fallback_call = parse_textual_tool_call(textual_tool_candidate)
+            if fallback_call and not pending_tool_calls:
+                tool_name, arguments = fallback_call
+                pending_tool_calls[0] = {
+                    "id": f"text-call-{round_no}",
+                    "name": tool_name,
+                    "arguments": arguments,
+                }
+            else:
                 if first_token_at is None:
                     first_token_at = time.perf_counter()
-                reply += content
-                yield _sse({"type": "content", "content": content})
+                reply += textual_tool_candidate
+                yield _sse({"type": "content", "content": textual_tool_candidate})
 
         if not pending_tool_calls:
             break  # 模型不再要工具：本轮输出即最终回答

@@ -10,7 +10,7 @@ dependencies = [
     "python-multipart>=0.0.18",  # FastAPI UploadFile 表单解析
     "pydantic[email]>=2.13",     # email extra 提供 EmailStr 校验（替代原直接依赖 email-validator）
     "zhipuai>=2.1",              # 对话模型 glm-4-flash
-    "google-genai>=2.16",        # embedding 模型 gemini-embedding-001
+    "httpx>=0.27",               # SiliconFlow embedding HTTP API
     "langchain-core>=1.5",       # 只用 @tool 装饰器
     "chromadb>=1.5",             # RAG 向量库
     "pypdf>=6.0",                # 文档解析：PDF
@@ -31,7 +31,6 @@ dev = [
     "pytest-cov>=6.0",
     "ruff>=0.9",
     "mypy>=1.13",
-    "httpx>=0.27",   # 测试用 API 客户端（TestClient 底层）
 ]
 
 [tool.uv]

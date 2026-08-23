@@ -4,7 +4,7 @@
 
 AI 多智能体创作工作台：注册登录 + 流式对话（SSE）+ RAG 文档问答 + 项目工作区。
 
-> 完整的架构说明、API 文档与部署文档在建（见 `unsolved.md` H2）。本 README 先提供最小可复现指引。
+> 完整的架构说明见 `architecture.md`；API/部署文档与量化指标仍在补充（见 `unsolved.md` H2/H3）。本 README 提供最小可复现指引。
 
 ## 技术栈
 
@@ -14,7 +14,7 @@ AI 多智能体创作工作台：注册登录 + 流式对话（SSE）+ RAG 文�
 ## 快速启动（开发环境）
 
 ```bash
-# 后端（需要 backend/.env，至少包含 SECRET_KEY；LLM/embedding 需 API_KEY/EMBEDDING_API_KEY）
+# 后端（需要 backend/.env，至少包含 SECRET_KEY；聊天用 API_KEY，RAG 使用 SiliconFlow 的 SILICONFLOW_API_KEY）
 ./dev.sh                 # 自动检查/拉起 Redis + 启动 uvicorn --reload
 
 # 前端
@@ -23,14 +23,21 @@ pnpm install
 pnpm dev
 ```
 
-## 质量门禁（与 CI 一致）
+```env
+# 聊天：智谱
+API_KEY=...
+# RAG：硅基流动免费版 BAAI/bge-m3
+SILICONFLOW_API_KEY=...
+EMBEDDING_MODEL=BAAI/bge-m3
+```
+
 
 ```bash
 # 后端（backend/ 目录）
 uv sync --all-groups     # 安装含 dev 组的全部依赖
 uv run ruff check .      # lint
 uv run mypy              # 类型检查（core/schemas/services/rag）
-uv run pytest            # 84 个用例（Redis 不在时相关用例自动跳过）
+uv run pytest            # 113 passed，Redis 不在时相关用例自动跳过
 
 # 前端（frontend/ 目录）
 pnpm lint                # ESLint

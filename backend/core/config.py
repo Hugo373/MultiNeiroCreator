@@ -37,7 +37,11 @@ if not SECRET_KEY:
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
 API_KEY = os.getenv("API_KEY", "").strip()
-EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY", "").strip()
+SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY", "").strip()
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3").strip()
+EMBEDDING_API_URL = os.getenv("EMBEDDING_API_URL", "https://api.siliconflow.cn/v1/embeddings").strip()
+RAG_COLLECTION_NAME = os.getenv("RAG_COLLECTION_NAME", "documents_siliconflow_bge_m3").strip()
+RAG_DISTANCE_THRESHOLD = float(os.getenv("RAG_DISTANCE_THRESHOLD", "1.10"))
 
 # ===== 限流配置（core/ratelimit.py 使用，全部可用环境变量覆盖）=====
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")

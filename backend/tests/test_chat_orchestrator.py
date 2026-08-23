@@ -11,6 +11,7 @@ import pytest
 
 from services.chat import chat_orchestrator
 from services.chat.context_builder import ChatContext
+from services.chat.tool_executor import ToolOutcome
 
 # ---------- 假流式分片 ----------
 
@@ -128,6 +129,32 @@ def test_no_tool(monkeypatch, persisted):
     assert persisted == [("user", "hi"), ("assistant", "你好")]
 
 
+def test_private_context_disables_web_fallback(monkeypatch, persisted):
+    async def private_context(user_id, message, project_id=None, attachments=None):
+        return ChatContext(
+            messages=[{"role": "system", "content": "私有 RAG 资料"}, {"role": "user", "content": message}],
+            clean_history=[{"role": "user", "content": message}],
+            persist_text=message,
+            attachments=[],
+            has_knowledge_context=True,
+        )
+
+    monkeypatch.setattr(chat_orchestrator, "build_chat_context", private_context)
+    fake, _events = run_chat(monkeypatch, [content_stream("根据文档回答")])
+    tool_names = {item["function"]["name"] for item in fake.calls[0]["tools"]}
+
+    assert "search_web" not in tool_names
+    assert "calculate" in tool_names
+
+
+def test_rag_miss_keeps_web_fallback_and_drops_local_time_shortcut(monkeypatch, persisted):
+    fake, _events = run_chat(monkeypatch, [content_stream("联网后备")])
+    tool_names = {item["function"]["name"] for item in fake.calls[0]["tools"]}
+
+    assert "search_web" in tool_names
+    assert "get_current_time" not in tool_names
+
+
 def test_single_tool(monkeypatch, persisted):
     script = [
         tool_call_stream((0, "call_1", "calculate", '{"expression": "1+1"}')),
@@ -208,3 +235,32 @@ def test_per_round_tool_call_cap(monkeypatch, persisted):
     assert len(tool_messages) == cap + 2  # 但每个 tool_call_id 都有应答（协议要求）
     skipped = [m for m in tool_messages if m["content"] == chat_orchestrator.TOOL_SKIPPED_RESULT]
     assert len(skipped) == 2
+
+
+def test_textual_tool_call_is_converted_instead_of_shown(monkeypatch, persisted):
+    async def fake_execute(func_name, func_args):
+        assert func_name == "search_web"
+        assert json.loads(func_args) == {"query": "最近人工智能行业新闻"}
+        return ToolOutcome(result="搜索结果：AI 行业摘要", ok=True)
+
+    monkeypatch.setattr(chat_orchestrator, "execute_tool", fake_execute)
+    fake, events = run_chat(
+        monkeypatch,
+        [
+            content_stream("search_web", '\n', '{"query": "最近人工智能行业新闻"}'),
+            content_stream("根据搜索结果整理：AI 行业摘要"),
+        ],
+    )
+
+    assert [event["tool_name"] for event in events_of(events, "tool")] == ["search_web"]
+    content = "".join(event["content"] for event in events_of(events, "content"))
+    assert "search_web" not in content
+    assert content == "根据搜索结果整理：AI 行业摘要"
+    assert len(fake.calls) == 2
+
+
+def test_incomplete_textual_tool_prefix_remains_normal_content(monkeypatch, persisted):
+    _fake, events = run_chat(monkeypatch, [content_stream("search_web 暂时不可用")])
+
+    content = "".join(event["content"] for event in events_of(events, "content"))
+    assert content == "search_web 暂时不可用"

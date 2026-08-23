@@ -180,12 +180,30 @@ def get_indexed_document_chunks(
     return [document for _, document in ordered_chunks]
 
 
+def _filter_by_distance(
+    documents: list[str],
+    distances: list[float] | None,
+    max_distance: float | None,
+) -> list[str]:
+    """只保留距离足够近的 chunk；没有距离时不把结果伪装成命中。"""
+    if max_distance is None:
+        return documents
+    if not distances:
+        return []
+    return [
+        document
+        for document, distance in zip(documents, distances, strict=False)
+        if isinstance(distance, (int, float)) and distance <= max_distance
+    ]
+
+
 def retrieve_documents(
     query_embedding,
     n_results: int = 3,
     user_id: int | None = None,
     project_id: int | None = None,
     scope: str = "assistant",
+    max_distance: float | None = None,
 ) -> list[str]:
     results = vectorstore.query(
         query_embeddings=[query_embedding],
@@ -196,4 +214,7 @@ def retrieve_documents(
     )
     if not results or not results.get("documents") or not results["documents"][0]:
         return []
-    return results["documents"][0]
+
+    documents = results["documents"][0]
+    distances = (results.get("distances") or [[]])[0]
+    return _filter_by_distance(documents, distances, max_distance)
