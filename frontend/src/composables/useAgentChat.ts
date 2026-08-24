@@ -66,6 +66,7 @@ export function useAgentChat(options: UseAgentChatOptions) {
       role: item.role,
       content: item.content,
       attachments: item.attachments?.map(hydrateAttachmentFromPayload),
+      citations: item.citations,
     }
   }
 

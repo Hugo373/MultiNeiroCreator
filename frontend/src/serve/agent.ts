@@ -9,10 +9,19 @@ export interface AgentAttachmentItem {
   meta?: string | null
 }
 
+export interface AgentCitation {
+  source: string
+  document_id: string | null
+  chunk_index: number
+  chunk_count: number
+  distance: number | null
+}
+
 export interface AgentHistoryItem {
   role: 'user' | 'assistant'
   content: string
   attachments?: AgentAttachmentItem[]
+  citations?: AgentCitation[]
 }
 
 export interface AgentChatPayload {
@@ -145,6 +154,7 @@ export interface AgentDoneEvent {
   type: 'done'
   history: AgentHistoryItem[]
   tool_used: string | null
+  citations: AgentCitation[]
 }
 
 type AgentStreamEvent = AgentToolEvent | AgentContentEvent | AgentDoneEvent

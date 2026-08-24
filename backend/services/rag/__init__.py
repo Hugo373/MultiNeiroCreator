@@ -3,6 +3,7 @@ from services.rag.parser import chunk_text, read_file
 from services.rag.service import (
     add_document,
     delete_document,
+    get_document_chunk_hits,
     get_document_chunks,
     list_documents,
     reindex_document,
@@ -15,6 +16,7 @@ __all__ = [
     "add_document",
     "chunk_text",
     "delete_document",
+    "get_document_chunk_hits",
     "get_document_chunks",
     "get_embedding",
     "get_embeddings_batch",

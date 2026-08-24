@@ -34,6 +34,9 @@ def test_indexed_chunks_keep_document_identity_and_citation_metadata() -> None:
 
 def test_retrieve_hits_preserve_source_and_distance(monkeypatch) -> None:
     class FakeStore:
+        def count(self):
+            return 1
+
         def query(self, **_kwargs):
             return {
                 "documents": [["相关片段"]],

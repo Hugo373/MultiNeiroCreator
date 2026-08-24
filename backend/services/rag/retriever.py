@@ -181,6 +181,38 @@ def get_indexed_document_chunks(
     return [document for _, document in ordered_chunks]
 
 
+def get_indexed_document_hits(
+    filename: str,
+    user_id: int | None = None,
+    project_id: int | None = None,
+    scope: str = "assistant",
+    document_id: str | None = None,
+) -> list[dict[str, Any]]:
+    results = vectorstore.get_documents(
+        user_id=user_id,
+        project_id=project_id,
+        scope=scope,
+        source=filename if document_id is None else None,
+        document_id=document_id,
+    )
+    metadatas = results.get("metadatas") or []
+    documents = results.get("documents") or []
+    ordered = sorted(
+        zip(metadatas, documents, strict=False),
+        key=lambda item: int(item[0].get("chunk_index", 0)),
+    )
+    return [
+        {
+            "content": document,
+            "source": metadata.get("source", filename),
+            "document_id": metadata.get("document_id"),
+            "chunk_index": int(metadata.get("chunk_index", 0)),
+            "chunk_count": int(metadata.get("chunk_count", 0)),
+        }
+        for metadata, document in ordered
+    ]
+
+
 def _filter_by_distance(
     documents: list[str],
     distances: list[float] | None,
@@ -207,9 +239,12 @@ def retrieve_document_hits(
     max_distance: float | None = None,
 ) -> list[dict[str, Any]]:
     """返回带来源元数据的召回结果，供引用展示和审计使用。"""
+    available = vectorstore.count()
+    if available == 0:
+        return []
     results = vectorstore.query(
         query_embeddings=[query_embedding],
-        n_results=n_results,
+        n_results=min(n_results, available),
         user_id=user_id,
         project_id=project_id,
         scope=scope,

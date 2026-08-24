@@ -31,7 +31,9 @@ CHAT_MODEL = "glm-4-flash"  # E4 会把模型名收进 config，先收敛到单�
 MAX_TOOL_ROUNDS = 5  # 最多允许模型连续请求工具的轮数
 MAX_TOOL_CALLS_PER_ROUND = 5  # 单轮最多执行的工具调用数
 
-TOOL_LIMIT_NOTICE = "已达到本次对话的工具调用轮数上限，请基于已获得的信息直接给出最终回答，不要再请求任何工具。"
+TOOL_LIMIT_NOTICE = (
+    "已达到本次对话的工具调用轮数上限，请基于已获得的信息直接给出最终回答，不要再请求任何工具。"
+)
 TOOL_SKIPPED_RESULT = "已超出单轮工具调用数量上限，本次调用未执行。请基于已有结果回答。"
 WEB_SEARCH_TOOL_NAME = "search_web"
 TEXT_TOOL_CALL_MAX_LENGTH = 1200
@@ -53,7 +55,7 @@ def parse_textual_tool_call(text: str) -> tuple[str, str] | None:
     for tool_name in sorted(tools_map, key=len, reverse=True):
         if not candidate.startswith(tool_name):
             continue
-        rest = candidate[len(tool_name):].lstrip()
+        rest = candidate[len(tool_name) :].lstrip()
         if not rest.startswith("{"):
             continue
         try:
@@ -78,16 +80,8 @@ def _could_be_textual_tool_call_prefix(text: str) -> bool:
 def _tools_for_context(has_knowledge_context: bool) -> list[dict]:
     """有私有资料时锁住联网工具；无命中时只保留计算和联网后备。"""
     if has_knowledge_context:
-        return [
-            tool
-            for tool in tools_schema
-            if tool.get("function", {}).get("name") != WEB_SEARCH_TOOL_NAME
-        ]
-    return [
-        tool
-        for tool in tools_schema
-        if tool.get("function", {}).get("name") != "get_current_time"
-    ]
+        return [tool for tool in tools_schema if tool.get("function", {}).get("name") != WEB_SEARCH_TOOL_NAME]
+    return [tool for tool in tools_schema if tool.get("function", {}).get("name") != "get_current_time"]
 
 
 def extract_stream_content(chunk) -> str:
@@ -143,7 +137,8 @@ async def stream_chat(
         raise
     except Exception as exc:
         logger.exception(
-            "对话流中断: %s", type(exc).__name__,
+            "对话流中断: %s",
+            type(exc).__name__,
             extra={
                 "evt": "chat_stream_error",
                 "error_type": type(exc).__name__,
@@ -252,26 +247,42 @@ async def _orchestrate(
         for position, call in enumerate(tool_calls):
             if position >= MAX_TOOL_CALLS_PER_ROUND:
                 # 超额调用不执行，但必须应答该 tool_call_id，否则下一轮请求非法
-                messages.append(
-                    {"role": "tool", "content": TOOL_SKIPPED_RESULT, "tool_call_id": call["id"]}
-                )
+                messages.append({"role": "tool", "content": TOOL_SKIPPED_RESULT, "tool_call_id": call["id"]})
                 continue
             yield _sse({"type": "tool", "tool_name": call["name"]})
             # 跑腿的绝不抛异常：成功/被拒/失败都是一张结果单，这里不分叉
             outcome = await execute_tool(call["name"], call["arguments"])
             tools_used.append(call["name"])
-            messages.append(
-                {"role": "tool", "content": outcome.result, "tool_call_id": call["id"]}
-            )
+            messages.append({"role": "tool", "content": outcome.result, "tool_call_id": call["id"]})
 
     tool_used = tools_used[-1] if tools_used else None
 
     clean_history = ctx.clean_history
     await asyncio.to_thread(
-        append_message, user["id"], "user", ctx.persist_text, project_id, ctx.attachments,
+        append_message,
+        user["id"],
+        "user",
+        ctx.persist_text,
+        project_id,
+        ctx.attachments,
     )
-    await asyncio.to_thread(append_message, user["id"], "assistant", reply, project_id)
-    clean_history.append({"role": "assistant", "content": reply})
+    assistant_history_item = {"role": "assistant", "content": reply}
+    if ctx.citations:
+        assistant_history_item["citations"] = ctx.citations
+    clean_history.append(assistant_history_item)
+
+    if ctx.citations:
+        await asyncio.to_thread(
+            append_message,
+            user["id"],
+            "assistant",
+            reply,
+            project_id,
+            None,
+            ctx.citations,
+        )
+    else:
+        await asyncio.to_thread(append_message, user["id"], "assistant", reply, project_id)
 
     now = time.perf_counter()
     logger.info(
@@ -290,4 +301,11 @@ async def _orchestrate(
             "total_ms": round((now - chat_started) * 1000, 1),
         },
     )
-    yield _sse({"type": "done", "history": clean_history, "tool_used": tool_used})
+    yield _sse(
+        {
+            "type": "done",
+            "history": clean_history,
+            "tool_used": tool_used,
+            "citations": ctx.citations,
+        }
+    )

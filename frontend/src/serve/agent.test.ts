@@ -22,17 +22,21 @@ interface Collected {
   tools: string[]
   contents: string[]
   doneCount: number
+  citations: string[]
 }
 
 async function run(chunks: string[]): Promise<Collected> {
-  const collected: Collected = { tools: [], contents: [], doneCount: 0 }
+  const collected: Collected = { tools: [], contents: [], doneCount: 0, citations: [] }
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sseResponse(chunks)))
   await streamAgentChat(
     { message: 'hi' },
     {
       onTool: (e) => collected.tools.push(e.tool_name),
       onContent: (e) => collected.contents.push(e.content),
-      onDone: () => collected.doneCount++,
+      onDone: (e) => {
+        collected.doneCount++
+        collected.citations.push(...(e.citations || []).map((item) => item.source))
+      },
     },
   )
   return collected
@@ -106,6 +110,13 @@ describe('streamAgentChat SSE 解析', () => {
     warn.mockRestore()
   })
 
+  it('done 事件保留 RAG 引用元数据', async () => {
+    const result = await run([
+      'data: {"type":"done","history":[],"tool_used":null,"citations":[{"source":"guide.md","document_id":"abc","chunk_index":1,"chunk_count":3,"distance":0.42}]}\n\n',
+    ])
+    expect(result.doneCount).toBe(1)
+    expect(result.citations).toEqual(['guide.md'])
+  })
   it('tool 事件分发 tool_name', async () => {
     const result = await run(['data: {"type":"tool","tool_name":"calculate"}\n\n'])
     expect(result.tools).toEqual(['calculate'])

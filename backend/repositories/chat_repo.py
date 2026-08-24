@@ -9,12 +9,21 @@ def append_message(
     content: str,
     project_id: int | None = None,
     attachments: list[dict] | None = None,
+    citations: list[dict] | None = None,
 ) -> None:
     with db_connection() as conn:
         conn.execute(
-            "INSERT INTO messages (user_id, project_id, role, content, attachments_json) VALUES (?, ?, ?, ?, ?)",
-            (user_id, project_id, role, content,
-             json.dumps(attachments, ensure_ascii=False) if attachments else None),
+            "INSERT INTO messages "
+            "(user_id, project_id, role, content, attachments_json, citations_json) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                user_id,
+                project_id,
+                role,
+                content,
+                json.dumps(attachments, ensure_ascii=False) if attachments else None,
+                json.dumps(citations, ensure_ascii=False) if citations else None,
+            ),
         )
 
 
@@ -22,24 +31,29 @@ def list_history(user_id: int, project_id: int | None = None) -> list[dict]:
     with db_connection() as conn:
         if project_id is None:
             rows = conn.execute(
-                "SELECT role, content, attachments_json FROM messages"
+                "SELECT role, content, attachments_json, citations_json FROM messages"
                 " WHERE user_id=? AND project_id IS NULL ORDER BY id",
                 (user_id,),
             ).fetchall()
         else:
             rows = conn.execute(
-                "SELECT role, content, attachments_json FROM messages"
+                "SELECT role, content, attachments_json, citations_json FROM messages"
                 " WHERE user_id=? AND project_id=? ORDER BY id",
                 (user_id, project_id),
             ).fetchall()
     history: list[dict] = []
-    for role, content, attachments_json in rows:
+    for role, content, attachments_json, citations_json in rows:
         item = {"role": role, "content": content}
         if attachments_json:
             try:
                 item["attachments"] = json.loads(attachments_json)
             except json.JSONDecodeError:
                 item["attachments"] = []
+        if citations_json:
+            try:
+                item["citations"] = json.loads(citations_json)
+            except json.JSONDecodeError:
+                item["citations"] = []
         history.append(item)
     return history
 

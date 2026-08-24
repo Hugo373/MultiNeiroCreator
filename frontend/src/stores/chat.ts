@@ -5,7 +5,7 @@
  */
 import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
-import type { AgentHistoryItem } from '@/serve/agent'
+import type { AgentCitation, AgentHistoryItem } from '@/serve/agent'
 import {
   buildUploadedAttachment,
   revokeAttachmentPreview,
@@ -20,6 +20,7 @@ export interface AgentMessage {
   isError?: boolean
   isPending?: boolean
   attachments?: UploadedAttachment[]
+  citations?: AgentCitation[]
 }
 
 export function formatToolName(toolName: string) {

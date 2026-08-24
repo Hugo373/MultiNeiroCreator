@@ -35,6 +35,17 @@
         </template>
         <template v-else>{{ message.content }}</template>
       </div>
+      <div v-if="message.citations?.length" class="agent-message-citations">
+        <div class="agent-citation-title">引用来源</div>
+        <div
+          v-for="(citation, index) in message.citations"
+          :key="`${message.id}-citation-${citation.document_id || citation.source}-${citation.chunk_index}-${index}`"
+          class="agent-citation-item"
+        >
+          <span class="agent-citation-source">{{ citation.source }}</span>
+          <span>· 片段 {{ citation.chunk_index + 1 }}</span>
+        </div>
+      </div>
       <div v-if="message.attachments?.length" class="agent-message-attachments">
         <article
           v-for="attachment in message.attachments"
@@ -219,6 +230,34 @@ const thinkingLetters = 'THINKING'.split('')
   border-color: rgba(173, 72, 72, 0.24);
   background: rgba(143, 45, 45, 0.1);
   color: #f0d8d8;
+}
+
+.agent-message-citations {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: min(92%, 100%);
+  padding: 7px 10px;
+  border-left: 2px solid rgba(167, 139, 250, 0.45);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.agent-citation-title {
+  color: rgba(196, 181, 253, 0.9);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.agent-citation-item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-citation-source {
+  color: var(--text-primary);
 }
 
 .agent-message-attachments {

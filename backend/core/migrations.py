@@ -204,12 +204,20 @@ def _m005_add_document_hash(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_hash ON documents(user_id, file_hash)")
 
 
+def _m006_add_message_citations(conn: sqlite3.Connection) -> None:
+    """保存 RAG 引用元数据，让历史消息刷新后仍能展示来源。"""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(messages)")}
+    if "citations_json" not in columns:
+        conn.execute("ALTER TABLE messages ADD COLUMN citations_json TEXT")
+
+
 MIGRATIONS: list[Migration] = [
     ("baseline: users/messages/projects + indexes", _m001_baseline),
     ("add foreign keys via table rebuild", _m002_add_foreign_keys),
     ("create persistent jobs table", _m003_create_jobs),
     ("create document lifecycle table", _m004_create_documents),
     ("add document content hash", _m005_add_document_hash),
+    ("add message citation metadata", _m006_add_message_citations),
 ]
 
 

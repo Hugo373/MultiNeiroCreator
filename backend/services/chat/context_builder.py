@@ -1,24 +1,15 @@
-"""上下文构建器（C2 拆分件之二）：负责"备菜"——组装喂给模型的 messages。
-
-职责边界（按消费者划分）：
-- messages 的消费者是**模型** → 这里负责：system prompt、附件上下文、RAG 检索、
-  服务端历史裁剪、附件标注，全部在此完成；
-- clean_history 的消费者是**前端**（done 事件）→ 一并在组装时顺产，编排器不再关心格式。
-
-纯函数 assemble_messages 与做 IO 的 build_chat_context 分开：消息构建顺序可以
-不碰数据库直接单测。
-"""
+"""上下文构建器：组装模型消息，并保留 RAG 来源引用元数据。"""
 
 import asyncio
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from agents.neyria import build_system_prompt
 from core import config
 from repositories.chat_repo import list_history
 from repositories.user_repo import get_profile
-from services.rag import get_document_chunks, search_with_metadata
+from services.rag import get_document_chunk_hits, search_with_metadata
 
 MAX_ATTACHMENT_CONTEXT_CHARS = 12000
 MAX_RETRIEVED_CONTEXT_CHARS = 6000
@@ -30,11 +21,12 @@ logger = logging.getLogger("assistant")
 class ChatContext:
     """一次对话所需的全部上下文成品。"""
 
-    messages: list[dict]  # 喂模型：system + 裁剪后历史 + 本条用户消息
-    clean_history: list[dict]  # 回前端：done 事件里的干净历史（含本条用户消息）
-    persist_text: str  # 持久化用的用户消息文本（空消息回落"已发送附件"）
-    attachments: list[dict]  # 规范化后的本条附件
-    has_knowledge_context: bool = False  # 是否检索到可供模型使用的私有资料
+    messages: list[dict]
+    clean_history: list[dict]
+    persist_text: str
+    attachments: list[dict]
+    citations: list[dict] = field(default_factory=list)
+    has_knowledge_context: bool = False
 
 
 def normalize_attachments(attachments: list[dict] | None) -> list[dict]:
@@ -64,31 +56,49 @@ def format_message_content_for_model(content: str, attachments: list[dict] | Non
     return f"{base_content}\n\n[该条消息附带文件：{attachment_names}]"
 
 
+def _citation_from_hit(hit: dict, source_fallback: str) -> dict:
+    return {
+        "source": hit.get("source", source_fallback),
+        "document_id": hit.get("document_id"),
+        "chunk_index": int(hit.get("chunk_index", 0)),
+        "chunk_count": int(hit.get("chunk_count", 0)),
+        "distance": hit.get("distance"),
+    }
+
+
 def build_attachment_context(
     user_id: int,
     project_id: int | None = None,
     attachments: list[dict] | None = None,
-) -> str:
+) -> tuple[str, list[dict]]:
     normalized_attachments = normalize_attachments(attachments)
     if not normalized_attachments:
-        return ""
+        return "", []
 
     sections: list[str] = []
+    citations: list[dict] = []
     consumed = 0
     for attachment in normalized_attachments:
-        chunks = get_document_chunks(
+        hits = get_document_chunk_hits(
             filename=attachment["name"],
             user_id=user_id,
             project_id=project_id,
         )
-        if not chunks:
+        if not hits:
             continue
 
         remaining = MAX_ATTACHMENT_CONTEXT_CHARS - consumed
         if remaining <= 0:
             break
 
-        content = "\n".join(chunk.strip() for chunk in chunks if chunk.strip()).strip()
+        content_parts: list[str] = []
+        for hit in hits:
+            text = str(hit.get("content", "")).strip()
+            if not text:
+                continue
+            content_parts.append(text)
+            citations.append(_citation_from_hit(hit, attachment["name"]))
+        content = "\n".join(content_parts).strip()
         if not content:
             continue
 
@@ -96,22 +106,23 @@ def build_attachment_context(
         sections.append(f"[附件 {attachment['name']}]\n{snippet}")
         consumed += len(snippet)
 
-    return "\n\n".join(sections)
+    return "\n\n".join(sections), citations
 
 
 def build_retrieved_context(
     user_id: int,
     message: str,
     project_id: int | None = None,
-) -> str:
+) -> tuple[str, list[dict]]:
     if not (message or "").strip():
-        return ""
+        return "", []
 
     hits = search_with_metadata(message, n_results=3, user_id=user_id, project_id=project_id)
     if not hits:
-        return ""
+        return "", []
 
-    sections = []
+    sections: list[str] = []
+    citations: list[dict] = []
     for hit in hits:
         content = str(hit.get("content", "")).strip()
         if not content:
@@ -119,9 +130,10 @@ def build_retrieved_context(
         source = str(hit.get("source", "未知文档"))
         chunk_index = int(hit.get("chunk_index", 0)) + 1
         sections.append(f"[来源：{source}｜片段 {chunk_index}]\n{content}")
+        citations.append(_citation_from_hit(hit, source))
 
     joined = "\n\n".join(sections).strip()
-    return joined[:MAX_RETRIEVED_CONTEXT_CHARS] if joined else ""
+    return (joined[:MAX_RETRIEVED_CONTEXT_CHARS] if joined else ""), citations
 
 
 def assemble_messages(
@@ -130,11 +142,7 @@ def assemble_messages(
     message: str,
     attachments: list[dict] | None = None,
 ) -> tuple[list[dict], list[dict]]:
-    """纯函数：把各层素材按固定顺序拼成 (messages, clean_history)。
-
-    顺序契约：system 最前 → 合法历史（过滤非 user/assistant 角色与空内容）→
-    本条用户消息最后。历史与本条消息若带附件，模型侧内容追加附件标注。
-    """
+    """纯函数：把各层素材按固定顺序拼成 (messages, clean_history)。"""
     messages: list[dict] = [{"role": "system", "content": system_prompt}]
     clean_history: list[dict] = []
     for item in history:
@@ -152,6 +160,8 @@ def assemble_messages(
         history_item: dict = {"role": role, "content": content}
         if normalized_history_attachments:
             history_item["attachments"] = normalized_history_attachments
+        if item.get("citations"):
+            history_item["citations"] = item["citations"]
         clean_history.append(history_item)
 
     normalized_attachments = normalize_attachments(attachments)
@@ -165,7 +175,6 @@ def assemble_messages(
     if normalized_attachments:
         current_user_history_item["attachments"] = normalized_attachments
     clean_history.append(current_user_history_item)
-
     return messages, clean_history
 
 
@@ -175,7 +184,7 @@ async def build_chat_context(
     project_id: int | None = None,
     attachments: list[dict] | None = None,
 ) -> ChatContext:
-    """做 IO 的入口：并行取 RAG 上下文与 profile/历史，产出 ChatContext。"""
+    """并行构建附件上下文和普通 RAG 上下文，单个分支失败不连坐。"""
     rag_started = time.perf_counter()
     try:
         attachment_result, retrieved_result = await asyncio.gather(
@@ -183,11 +192,11 @@ async def build_chat_context(
             asyncio.to_thread(build_retrieved_context, user_id, message, project_id),
             return_exceptions=True,
         )
-        attachment_context = (
-            attachment_result if isinstance(attachment_result, str) else ""
+        attachment_context, attachment_citations = (
+            attachment_result if isinstance(attachment_result, tuple) else ("", [])
         )
-        retrieved_context = (
-            retrieved_result if isinstance(retrieved_result, str) else ""
+        retrieved_context, retrieved_citations = (
+            retrieved_result if isinstance(retrieved_result, tuple) else ("", [])
         )
         for label, result in (("attachment", attachment_result), ("retrieval", retrieved_result)):
             if isinstance(result, Exception):
@@ -201,6 +210,7 @@ async def build_chat_context(
                 )
         context_sections = [item for item in [attachment_context, retrieved_context] if item]
         context = "\n\n".join(context_sections)
+        citations = attachment_citations + retrieved_citations
         logger.info(
             "上下文构建完成",
             extra={
@@ -208,10 +218,10 @@ async def build_chat_context(
                 "duration_ms": round((time.perf_counter() - rag_started) * 1000, 1),
                 "attachment_chars": len(attachment_context),
                 "retrieved_chars": len(retrieved_context),
+                "citation_count": len(citations),
             },
         )
     except Exception as exc:
-        # 降级不降噪：RAG 挂了对话仍可用，但必须留痕，否则检索失效只会表现为"回答质量变差"
         logger.warning(
             "上下文构建失败，降级为无 RAG 上下文: %s",
             type(exc).__name__,
@@ -219,20 +229,16 @@ async def build_chat_context(
             extra={"evt": "context_build_error", "error_type": type(exc).__name__},
         )
         context = ""
+        citations = []
 
-    # 同步 DB 读丢线程池：SSE 生成器调用链上任何同步调用都在占用事件循环（C1）
     profile, full_history = await asyncio.gather(
         asyncio.to_thread(get_profile, user_id),
         asyncio.to_thread(list_history, user_id, project_id),
     )
     system_prompt = build_system_prompt(profile, context)
-
-    # 对话历史以服务端数据库为唯一真源，不信任客户端传来的内容（防伪造上下文注入）
     history = full_history[-config.CHAT_HISTORY_MAX_ITEMS :]
-
     messages, clean_history = assemble_messages(system_prompt, history, message, attachments)
     persist_text = message if (message or "").strip() else "已发送附件"
-    # done 事件与持久化保持同一份文本：空消息统一显示"已发送附件"
     clean_history[-1]["content"] = persist_text
 
     return ChatContext(
@@ -240,5 +246,6 @@ async def build_chat_context(
         clean_history=clean_history,
         persist_text=persist_text,
         attachments=normalize_attachments(attachments),
+        citations=citations,
         has_knowledge_context=bool(context),
     )

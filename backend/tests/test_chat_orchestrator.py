@@ -80,8 +80,11 @@ class FakeClient:
 def persisted(monkeypatch):
     saved = []
     monkeypatch.setattr(
-        chat_orchestrator, "append_message",
-        lambda user_id, role, content, project_id=None, attachments=None: saved.append((role, content)),
+        chat_orchestrator,
+        "append_message",
+        lambda user_id, role, content, project_id=None, attachments=None, citations=None: saved.append(
+            (role, content)
+        ),
     )
 
     async def fake_context(user_id, message, project_id=None, attachments=None):
@@ -127,6 +130,33 @@ def test_no_tool(monkeypatch, persisted):
     assert len(fake.calls) == 1
     assert "tools" in fake.calls[0]  # 首轮必须把工具亮给模型
     assert persisted == [("user", "hi"), ("assistant", "你好")]
+
+
+def test_done_includes_rag_citations(monkeypatch, persisted):
+    async def citation_context(user_id, message, project_id=None, attachments=None):
+        return ChatContext(
+            messages=[{"role": "system", "content": "RAG"}, {"role": "user", "content": message}],
+            clean_history=[{"role": "user", "content": message}],
+            persist_text=message,
+            attachments=[],
+            citations=[
+                {
+                    "source": "guide.md",
+                    "document_id": "d" * 32,
+                    "chunk_index": 1,
+                    "chunk_count": 3,
+                    "distance": 0.42,
+                }
+            ],
+            has_knowledge_context=True,
+        )
+
+    monkeypatch.setattr(chat_orchestrator, "build_chat_context", citation_context)
+    _fake, events = run_chat(monkeypatch, [content_stream("有依据的回答")])
+
+    done = events_of(events, "done")[0]
+    assert done["citations"][0]["source"] == "guide.md"
+    assert done["history"][-1]["citations"][0]["chunk_index"] == 1
 
 
 def test_private_context_disables_web_fallback(monkeypatch, persisted):
@@ -207,8 +237,7 @@ def test_tool_failure_does_not_break_stream(monkeypatch, persisted):
 def test_infinite_tool_requests_hit_round_limit(monkeypatch, persisted):
     rounds = chat_orchestrator.MAX_TOOL_ROUNDS
     script = [
-        tool_call_stream((0, f"call_{i}", "calculate", '{"expression": "1+1"}'))
-        for i in range(rounds)
+        tool_call_stream((0, f"call_{i}", "calculate", '{"expression": "1+1"}')) for i in range(rounds)
     ] + [content_stream("最终回答")]
     fake, events = run_chat(monkeypatch, script)
 
@@ -224,9 +253,7 @@ def test_infinite_tool_requests_hit_round_limit(monkeypatch, persisted):
 
 def test_per_round_tool_call_cap(monkeypatch, persisted):
     cap = chat_orchestrator.MAX_TOOL_CALLS_PER_ROUND
-    calls = [
-        (i, f"call_{i}", "calculate", '{"expression": "1+1"}') for i in range(cap + 2)
-    ]
+    calls = [(i, f"call_{i}", "calculate", '{"expression": "1+1"}') for i in range(cap + 2)]
     script = [tool_call_stream(*calls), content_stream("ok")]
     fake, events = run_chat(monkeypatch, script)
 
@@ -247,7 +274,7 @@ def test_textual_tool_call_is_converted_instead_of_shown(monkeypatch, persisted)
     fake, events = run_chat(
         monkeypatch,
         [
-            content_stream("search_web", '\n', '{"query": "最近人工智能行业新闻"}'),
+            content_stream("search_web", "\n", '{"query": "最近人工智能行业新闻"}'),
             content_stream("根据搜索结果整理：AI 行业摘要"),
         ],
     )

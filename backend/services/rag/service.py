@@ -7,6 +7,7 @@ from services.rag.retriever import (
     add_indexed_document,
     delete_indexed_document,
     get_indexed_document_chunks,
+    get_indexed_document_hits,
     list_indexed_documents,
     retrieve_document_hits,
     retrieve_documents,
@@ -172,6 +173,22 @@ def get_document_chunks(
     document_id: str | None = None,
 ) -> list[str]:
     return get_indexed_document_chunks(
+        filename=filename,
+        user_id=user_id,
+        project_id=project_id,
+        scope=scope,
+        document_id=document_id,
+    )
+
+
+def get_document_chunk_hits(
+    filename: str,
+    user_id: int | None = None,
+    project_id: int | None = None,
+    scope: str = "assistant",
+    document_id: str | None = None,
+) -> list[dict[str, Any]]:
+    return get_indexed_document_hits(
         filename=filename,
         user_id=user_id,
         project_id=project_id,
