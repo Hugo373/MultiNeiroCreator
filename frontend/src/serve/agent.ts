@@ -22,11 +22,93 @@ export interface AgentChatPayload {
   attachments?: AgentAttachmentItem[]
 }
 
+export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
+
+export interface JobItem {
+  id: string
+  type: string
+  status: JobStatus
+  user_id: number
+  project_id: number | null
+  payload: Record<string, unknown>
+  result: Record<string, unknown> | null
+  error: string | null
+  progress: number
+  progress_message: string | null
+  attempts: number
+  max_attempts: number
+  cancel_requested: boolean
+  created_at: string
+  started_at: string | null
+  finished_at: string | null
+}
+
+export type DocumentStatus = 'queued' | 'processing' | 'ready' | 'failed' | 'cancelled' | 'deleted'
+
+export interface AgentDocument {
+  id: string
+  user_id: number
+  project_id: number | null
+  filename: string
+  status: DocumentStatus
+  size_bytes: number
+  file_hash: string | null
+  chunks_count: number
+  error: string | null
+  job_id: string | null
+  created_at: string
+  updated_at: string
+  indexed_at: string | null
+}
+
 export interface AgentDocumentMutationResponse {
   status: string
   message: string
-  deleted_chunks?: number
-  chunks_count?: number
+  document: AgentDocument
+  job?: JobItem | null
+}
+
+export async function getAgentDocuments(projectId?: number | null) {
+  const suffix = projectId != null ? `?project_id=${projectId}` : ''
+  return request.get<unknown, AgentDocument[]>(`/documents${suffix}`)
+}
+
+export async function getAgentJobs(projectId?: number | null) {
+  const suffix = projectId != null ? `?project_id=${projectId}` : ''
+  return request.get<unknown, JobItem[]>(`/jobs${suffix}`)
+}
+
+export async function getAgentJob(jobId: string) {
+  return request.get<unknown, JobItem>(`/jobs/${jobId}`)
+}
+
+export async function waitForAgentJob(jobId: string, timeoutMs = 5 * 60 * 1000) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const job = await getAgentJob(jobId)
+    if (job.status === 'succeeded') return job
+    if (job.status === 'failed' || job.status === 'cancelled') {
+      throw new Error(
+        job.error || (job.status === 'cancelled' ? '文档索引任务已取消' : '文档索引失败'),
+      )
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 1000))
+  }
+  throw new Error('文档索引等待超时，请稍后在后台任务面板查看状态')
+}
+
+export async function cancelAgentJob(jobId: string) {
+  return request.post<unknown, JobItem>(`/jobs/${jobId}/cancel`)
+}
+
+export async function retryAgentJob(jobId: string) {
+  return request.post<unknown, JobItem>(`/jobs/${jobId}/retry`)
+}
+
+export async function reindexAgentDocument(documentId: string) {
+  return request.post<unknown, AgentDocumentMutationResponse>(
+    `/documents/reindex?document_id=${encodeURIComponent(documentId)}`,
+  )
 }
 
 export async function uploadAgentDocument(file: File, projectId?: number | null) {
@@ -40,10 +122,10 @@ export async function uploadAgentDocument(file: File, projectId?: number | null)
   })
 }
 
-export async function deleteAgentDocument(filename: string, projectId?: number | null) {
+export async function deleteAgentDocument(documentId: string, projectId?: number | null) {
   return request.delete<unknown, AgentDocumentMutationResponse>('/documents', {
     data: {
-      filename,
+      document_id: documentId,
       project_id: projectId,
     },
   })

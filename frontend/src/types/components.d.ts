@@ -21,5 +21,6 @@ declare module 'vue' {
     ProjectSwitcher: typeof import('./../components/project/ProjectSwitcher.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    TaskPanel: typeof import('./../components/task/TaskPanel.vue')['default']
   }
 }

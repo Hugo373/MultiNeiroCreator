@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from core.deps import verify_token
@@ -53,7 +53,7 @@ def clear_history_route(project_id: int | None = None, user=Depends(verify_token
     return clear_history(user["id"], project_id)
 
 
-@router.post("/upload")
+@router.post("/upload", status_code=status.HTTP_202_ACCEPTED)
 async def upload_file(
     file: UploadFile = File(...),
     project_id: int | None = Query(None),
@@ -64,7 +64,7 @@ async def upload_file(
     size = file.file.tell()
     file.file.seek(0)
     await enforce_upload_limits(user["id"], size)
-    return await upload_document(file, user["id"], project_id)
+    return await upload_document(file, user["id"], project_id, size)
 
 
 @router.get("/documents")
@@ -74,13 +74,18 @@ def list_rag_documents_route(project_id: int | None = None, user=Depends(verify_
 
 @router.delete("/documents")
 def delete_rag_document_route(req: RagDocumentDeleteRequest, user=Depends(verify_token)):
-    return remove_rag_document(req.filename, user["id"], req.project_id)
+    return remove_rag_document(req.filename, user["id"], req.project_id, req.document_id)
 
 
 @router.post("/documents/reindex")
 def reindex_rag_document_route(
-    filename: str = Query(..., min_length=1, max_length=255),
+    document_id: str | None = Query(None, min_length=32, max_length=32),
+    filename: str | None = Query(None, min_length=1, max_length=255),
     project_id: int | None = Query(None),
     user=Depends(verify_token),
 ):
-    return rebuild_rag_document(filename, user["id"], project_id)
+    if document_id is None and filename is None:
+        raise HTTPException(status_code=422, detail="document_id 或 filename 至少提供一个")
+    return rebuild_rag_document(
+        document_id=document_id, filename=filename, user_id=user["id"], project_id=project_id
+    )

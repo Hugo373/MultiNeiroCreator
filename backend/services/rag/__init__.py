@@ -8,6 +8,7 @@ from services.rag.service import (
     reindex_document,
     replace_document,
     search,
+    search_with_metadata,
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "reindex_document",
     "replace_document",
     "search",
+    "search_with_metadata",
 ]

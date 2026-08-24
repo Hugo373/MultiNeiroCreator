@@ -32,7 +32,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
     raise RuntimeError(
         "未配置 SECRET_KEY 环境变量，服务拒绝启动。"
-        "请在 .env 中设置一个随机密钥，例如：python -c \"import secrets; print(secrets.token_hex(32))\""
+        '请在 .env 中设置一个随机密钥，例如：python -c "import secrets; print(secrets.token_hex(32))"'
     )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
@@ -42,6 +42,11 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3").strip()
 EMBEDDING_API_URL = os.getenv("EMBEDDING_API_URL", "https://api.siliconflow.cn/v1/embeddings").strip()
 RAG_COLLECTION_NAME = os.getenv("RAG_COLLECTION_NAME", "documents_siliconflow_bge_m3").strip()
 RAG_DISTANCE_THRESHOLD = float(os.getenv("RAG_DISTANCE_THRESHOLD", "1.10"))
+
+# 原始上传文档只存服务器受控目录，文件名不直接参与路径拼接；可用环境变量迁移到独立数据盘。
+DOCUMENT_STORAGE_DIR = Path(
+    os.getenv("DOCUMENT_STORAGE_DIR", str(BACKEND_DIR / "data" / "documents"))
+).expanduser()
 
 # ===== 限流配置（core/ratelimit.py 使用，全部可用环境变量覆盖）=====
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -64,3 +69,8 @@ CHAT_MESSAGE_MAX_CHARS = int(os.getenv("CHAT_MESSAGE_MAX_CHARS", "20000"))
 CHAT_HISTORY_MAX_ITEMS = int(os.getenv("CHAT_HISTORY_MAX_ITEMS", "200"))
 CHAT_ATTACHMENTS_MAX_ITEMS = int(os.getenv("CHAT_ATTACHMENTS_MAX_ITEMS", "20"))
 PROFILE_MAX_CHARS = int(os.getenv("PROFILE_MAX_CHARS", "5000"))
+
+# ===== E3 持久化任务 Worker =====
+JOB_LEASE_SECONDS = int(os.getenv("JOB_LEASE_SECONDS", "60"))
+JOB_MAX_ATTEMPTS = int(os.getenv("JOB_MAX_ATTEMPTS", "3"))
+JOB_POLL_INTERVAL_SECONDS = float(os.getenv("JOB_POLL_INTERVAL_SECONDS", "1"))

@@ -77,6 +77,7 @@
                     </button>
                   </div>
                 </section>
+                <TaskPanel />
               </div>
             </div>
           </aside>
@@ -211,6 +212,7 @@ import {
 import ProjectSwitcher from '@/components/project/ProjectSwitcher.vue'
 import CreateProjectDialog from '@/components/project/CreateProjectDialog.vue'
 import AssistantPanel from '@/components/assistant/AssistantPanel.vue'
+import TaskPanel from '@/components/task/TaskPanel.vue'
 import '@/views/workstation/styles/workstation-base.css'
 
 interface ToolModalOption {

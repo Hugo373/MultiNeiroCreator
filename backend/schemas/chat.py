@@ -1,5 +1,4 @@
-
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from core import config
 
@@ -25,5 +24,12 @@ class ProfileRequest(BaseModel):
 
 
 class RagDocumentDeleteRequest(BaseModel):
-    filename: str = Field(..., min_length=1, max_length=255)
+    document_id: str | None = Field(default=None, min_length=32, max_length=32)
+    filename: str | None = Field(default=None, min_length=1, max_length=255)
     project_id: int | None = None
+
+    @model_validator(mode="after")
+    def require_document_identity(self):
+        if not self.document_id and not self.filename:
+            raise ValueError("document_id 或 filename 至少提供一个")
+        return self

@@ -18,7 +18,7 @@ from agents.neyria import build_system_prompt
 from core import config
 from repositories.chat_repo import list_history
 from repositories.user_repo import get_profile
-from services.rag import get_document_chunks, search
+from services.rag import get_document_chunks, search_with_metadata
 
 MAX_ATTACHMENT_CONTEXT_CHARS = 12000
 MAX_RETRIEVED_CONTEXT_CHARS = 6000
@@ -107,11 +107,20 @@ def build_retrieved_context(
     if not (message or "").strip():
         return ""
 
-    docs = search(message, n_results=3, user_id=user_id, project_id=project_id)
-    if not docs:
+    hits = search_with_metadata(message, n_results=3, user_id=user_id, project_id=project_id)
+    if not hits:
         return ""
 
-    joined = "\n".join(doc.strip() for doc in docs if doc.strip()).strip()
+    sections = []
+    for hit in hits:
+        content = str(hit.get("content", "")).strip()
+        if not content:
+            continue
+        source = str(hit.get("source", "未知文档"))
+        chunk_index = int(hit.get("chunk_index", 0)) + 1
+        sections.append(f"[来源：{source}｜片段 {chunk_index}]\n{content}")
+
+    joined = "\n\n".join(sections).strip()
     return joined[:MAX_RETRIEVED_CONTEXT_CHARS] if joined else ""
 
 
@@ -169,10 +178,27 @@ async def build_chat_context(
     """做 IO 的入口：并行取 RAG 上下文与 profile/历史，产出 ChatContext。"""
     rag_started = time.perf_counter()
     try:
-        attachment_context, retrieved_context = await asyncio.gather(
+        attachment_result, retrieved_result = await asyncio.gather(
             asyncio.to_thread(build_attachment_context, user_id, project_id, attachments),
             asyncio.to_thread(build_retrieved_context, user_id, message, project_id),
+            return_exceptions=True,
         )
+        attachment_context = (
+            attachment_result if isinstance(attachment_result, str) else ""
+        )
+        retrieved_context = (
+            retrieved_result if isinstance(retrieved_result, str) else ""
+        )
+        for label, result in (("attachment", attachment_result), ("retrieval", retrieved_result)):
+            if isinstance(result, Exception):
+                logger.warning(
+                    "单个知识库上下文分支失败",
+                    extra={
+                        "evt": "context_branch_error",
+                        "branch": label,
+                        "error_type": type(result).__name__,
+                    },
+                )
         context_sections = [item for item in [attachment_context, retrieved_context] if item]
         context = "\n\n".join(context_sections)
         logger.info(
@@ -187,7 +213,9 @@ async def build_chat_context(
     except Exception as exc:
         # 降级不降噪：RAG 挂了对话仍可用，但必须留痕，否则检索失效只会表现为"回答质量变差"
         logger.warning(
-            "上下文构建失败，降级为无 RAG 上下文: %s", type(exc).__name__, exc_info=True,
+            "上下文构建失败，降级为无 RAG 上下文: %s",
+            type(exc).__name__,
+            exc_info=True,
             extra={"evt": "context_build_error", "error_type": type(exc).__name__},
         )
         context = ""
@@ -200,7 +228,7 @@ async def build_chat_context(
     system_prompt = build_system_prompt(profile, context)
 
     # 对话历史以服务端数据库为唯一真源，不信任客户端传来的内容（防伪造上下文注入）
-    history = full_history[-config.CHAT_HISTORY_MAX_ITEMS:]
+    history = full_history[-config.CHAT_HISTORY_MAX_ITEMS :]
 
     messages, clean_history = assemble_messages(system_prompt, history, message, attachments)
     persist_text = message if (message or "").strip() else "已发送附件"

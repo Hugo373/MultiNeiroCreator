@@ -12,6 +12,7 @@ from core.ratelimit import redis_client
 from core.request_context import RequestContextMiddleware
 from routers.assistant import router as assistant_router
 from routers.auth import router as auth_router
+from routers.jobs import router as jobs_router
 from routers.projects import router as projects_router
 
 setup_logging()
@@ -41,6 +42,7 @@ register_exception_handlers(app)
 app.include_router(auth_router)
 app.include_router(assistant_router)
 app.include_router(projects_router)
+app.include_router(jobs_router)
 
 
 @app.get("/health")

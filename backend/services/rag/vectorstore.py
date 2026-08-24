@@ -23,6 +23,7 @@ class VectorStore:
         project_id: int | None = None,
         scope: str | None = None,
         source: str | None = None,
+        document_id: str | None = None,
     ):
         clauses: list[dict] = []
         if user_id is not None:
@@ -33,13 +34,13 @@ class VectorStore:
             clauses.append({"scope": scope})
         if source:
             clauses.append({"source": source})
+        if document_id:
+            clauses.append({"document_id": document_id})
 
         if not clauses:
             return None
-
         if len(clauses) == 1:
             return clauses[0]
-
         return {"$and": clauses}
 
     def add_documents(
@@ -63,8 +64,9 @@ class VectorStore:
         project_id: int | None = None,
         scope: str | None = None,
         source: str | None = None,
+        document_id: str | None = None,
     ) -> None:
-        where = self._build_metadata_filter(user_id, project_id, scope, source)
+        where = self._build_metadata_filter(user_id, project_id, scope, source, document_id)
         self.collection.delete(ids=ids, where=where)
 
     def query(
@@ -76,8 +78,9 @@ class VectorStore:
         project_id: int | None = None,
         scope: str | None = None,
         source: str | None = None,
+        document_id: str | None = None,
     ):
-        where = self._build_metadata_filter(user_id, project_id, scope, source)
+        where = self._build_metadata_filter(user_id, project_id, scope, source, document_id)
         return self.collection.query(
             query_embeddings=query_embeddings,
             query_texts=query_texts,
@@ -96,13 +99,10 @@ class VectorStore:
         project_id: int | None = None,
         scope: str | None = None,
         source: str | None = None,
+        document_id: str | None = None,
     ):
-        where = self._build_metadata_filter(user_id, project_id, scope, source)
-        return self.collection.get(
-            limit=limit,
-            offset=offset,
-            where=where,
-        )
+        where = self._build_metadata_filter(user_id, project_id, scope, source, document_id)
+        return self.collection.get(limit=limit, offset=offset, where=where)
 
     def get_documents(
         self,
@@ -111,12 +111,10 @@ class VectorStore:
         project_id: int | None = None,
         scope: str | None = None,
         source: str | None = None,
+        document_id: str | None = None,
     ):
-        where = self._build_metadata_filter(user_id, project_id, scope, source)
-        return self.collection.get(
-            ids=ids,
-            where=where,
-        )
+        where = self._build_metadata_filter(user_id, project_id, scope, source, document_id)
+        return self.collection.get(ids=ids, where=where)
 
 
 vectorstore = VectorStore()

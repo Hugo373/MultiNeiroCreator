@@ -9,6 +9,7 @@ import {
   getAgentHistory,
   streamAgentChat,
   uploadAgentDocument,
+  waitForAgentJob,
   type AgentAttachmentItem,
   type AgentHistoryItem,
 } from '@/serve/agent'
@@ -16,6 +17,7 @@ import { createTypewriter } from '@/utils/typewriter'
 import { cloneAttachmentForMessage, hydrateAttachmentFromPayload } from '@/utils/attachment'
 import { useChatStore, type AgentMessage } from '@/stores/chat'
 import { useProjectStore } from '@/stores/project'
+import { useTaskStore } from '@/stores/tasks'
 
 const AGENT_FIRST_TOKEN_TIMEOUT_MS = 10000
 
@@ -27,6 +29,7 @@ interface UseAgentChatOptions {
 export function useAgentChat(options: UseAgentChatOptions) {
   const chatStore = useChatStore()
   const projectStore = useProjectStore()
+  const taskStore = useTaskStore()
 
   let thinkingTimer: number | null = null
   let firstTokenTimeout: number | null = null
@@ -110,8 +113,11 @@ export function useAgentChat(options: UseAgentChatOptions) {
         for (const attachment of pendingAttachments) {
           if (!attachment.file) continue
           const result = await uploadAgentDocument(attachment.file, projectStore.id)
-          if (result.status !== 'success') {
+          if (result.status !== 'accepted' && result.status !== 'success') {
             throw new Error(result.message || `附件上传失败：${attachment.name}`)
+          }
+          if (result.job) {
+            await waitForAgentJob(result.job.id)
           }
           attachmentPayloads.push({
             name: attachment.name,
@@ -120,6 +126,7 @@ export function useAgentChat(options: UseAgentChatOptions) {
             meta: attachment.meta,
           })
         }
+        void taskStore.load(projectStore.id)
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : '附件发送失败'
         ElMessage.error(errorMessage)

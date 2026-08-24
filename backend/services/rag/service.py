@@ -1,3 +1,5 @@
+from typing import Any
+
 from core.config import RAG_DISTANCE_THRESHOLD
 from services.rag.embedding import get_embedding, get_embeddings_batch
 from services.rag.parser import chunk_text, read_file
@@ -6,6 +8,7 @@ from services.rag.retriever import (
     delete_indexed_document,
     get_indexed_document_chunks,
     list_indexed_documents,
+    retrieve_document_hits,
     retrieve_documents,
 )
 
@@ -19,6 +22,7 @@ def add_document(
     replace_existing: bool = True,
     chunk_size: int = 500,
     chunk_overlap: int = 100,
+    document_id: str | None = None,
 ) -> int:
     text = read_file(file_path, filename)
     chunks = chunk_text(text, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
@@ -35,6 +39,7 @@ def add_document(
         replace_existing=replace_existing,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
+        document_id=document_id,
     )
 
 
@@ -46,6 +51,7 @@ def replace_document(
     scope: str = "assistant",
     chunk_size: int = 500,
     chunk_overlap: int = 100,
+    document_id: str | None = None,
 ) -> int:
     return add_document(
         file_path=file_path,
@@ -56,6 +62,7 @@ def replace_document(
         replace_existing=True,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
+        document_id=document_id,
     )
 
 
@@ -68,6 +75,24 @@ def search(
 ) -> list[str]:
     embedding = get_embedding(query)
     return retrieve_documents(
+        query_embedding=embedding,
+        n_results=n_results,
+        user_id=user_id,
+        project_id=project_id,
+        scope=scope,
+        max_distance=RAG_DISTANCE_THRESHOLD,
+    )
+
+
+def search_with_metadata(
+    query: str,
+    n_results: int = 3,
+    user_id: int | None = None,
+    project_id: int | None = None,
+    scope: str = "assistant",
+) -> list[dict[str, Any]]:
+    embedding = get_embedding(query)
+    return retrieve_document_hits(
         query_embedding=embedding,
         n_results=n_results,
         user_id=user_id,
@@ -98,12 +123,14 @@ def delete_document(
     user_id: int | None = None,
     project_id: int | None = None,
     scope: str = "assistant",
+    document_id: str | None = None,
 ) -> int:
     return delete_indexed_document(
         filename=filename,
         user_id=user_id,
         project_id=project_id,
         scope=scope,
+        document_id=document_id,
     )
 
 
@@ -112,12 +139,14 @@ def reindex_document(
     user_id: int | None = None,
     project_id: int | None = None,
     scope: str = "assistant",
+    document_id: str | None = None,
 ) -> int:
     chunks = get_indexed_document_chunks(
         filename=filename,
         user_id=user_id,
         project_id=project_id,
         scope=scope,
+        document_id=document_id,
     )
     if not chunks:
         raise ValueError(f"未找到文档：{filename}")
@@ -131,6 +160,7 @@ def reindex_document(
         project_id=project_id,
         scope=scope,
         replace_existing=True,
+        document_id=document_id,
     )
 
 
@@ -139,10 +169,12 @@ def get_document_chunks(
     user_id: int | None = None,
     project_id: int | None = None,
     scope: str = "assistant",
+    document_id: str | None = None,
 ) -> list[str]:
     return get_indexed_document_chunks(
         filename=filename,
         user_id=user_id,
         project_id=project_id,
         scope=scope,
+        document_id=document_id,
     )

@@ -69,10 +69,71 @@ def _m001_baseline(conn: sqlite3.Connection) -> None:
         """
     )
     # 索引支撑高频查询 WHERE user_id=? [AND project_id=?]（最左前缀覆盖单查 user_id）
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_messages_user_project ON messages(user_id, project_id)"
-    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_user_project ON messages(user_id, project_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id)")
+
+
+def _m003_create_jobs(conn: sqlite3.Connection) -> None:
+    """创建持久化后台任务表，为 E3 Worker 提供可恢复的任务账本。"""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS jobs (
+            id TEXT PRIMARY KEY,
+            type TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')),
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+            payload_json TEXT NOT NULL,
+            result_json TEXT,
+            error_message TEXT,
+            progress INTEGER NOT NULL DEFAULT 0 CHECK (progress BETWEEN 0 AND 100),
+            progress_message TEXT,
+            attempts INTEGER NOT NULL DEFAULT 0,
+            max_attempts INTEGER NOT NULL DEFAULT 3 CHECK (max_attempts > 0),
+            next_run_at TEXT,
+            claimed_by TEXT,
+            lease_expires_at TEXT,
+            cancel_requested INTEGER NOT NULL DEFAULT 0 CHECK (cancel_requested IN (0, 1)),
+            created_at TEXT NOT NULL,
+            started_at TEXT,
+            finished_at TEXT
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_queue ON jobs(status, next_run_at, created_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_user_project ON jobs(user_id, project_id, created_at)")
+
+
+def _m004_create_documents(conn: sqlite3.Connection) -> None:
+    """保存原始文档和异步索引生命周期，供 E3 Worker 在重启后恢复。"""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS documents (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+            filename TEXT NOT NULL,
+            storage_path TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('queued', 'processing', 'ready', 'failed', 'cancelled', 'deleted')),
+            size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0),
+            chunks_count INTEGER NOT NULL DEFAULT 0 CHECK (chunks_count >= 0),
+            error_message TEXT,
+            job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            indexed_at TEXT
+        )
+        """
+    )
+    # SQLite 的 NULL 不参与普通 UNIQUE，因此用表达式把“默认知识库”的 NULL 项目归一为 -1。
+    conn.execute("DROP INDEX IF EXISTS idx_documents_identity")
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_identity "
+        "ON documents(user_id, COALESCE(project_id, -1), filename) WHERE status != 'deleted'"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_documents_user_project ON documents(user_id, project_id, updated_at)"
+    )
 
 
 def _m002_add_foreign_keys(conn: sqlite3.Connection) -> None:
@@ -132,14 +193,23 @@ def _m002_add_foreign_keys(conn: sqlite3.Connection) -> None:
     )
     conn.execute("DROP TABLE messages")
     conn.execute("ALTER TABLE messages_new RENAME TO messages")
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_messages_user_project ON messages(user_id, project_id)"
-    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_user_project ON messages(user_id, project_id)")
+
+
+def _m005_add_document_hash(conn: sqlite3.Connection) -> None:
+    """为文档记录内容指纹，便于重复上传识别和后续去重策略。"""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(documents)")}
+    if "file_hash" not in columns:
+        conn.execute("ALTER TABLE documents ADD COLUMN file_hash TEXT")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_hash ON documents(user_id, file_hash)")
 
 
 MIGRATIONS: list[Migration] = [
     ("baseline: users/messages/projects + indexes", _m001_baseline),
     ("add foreign keys via table rebuild", _m002_add_foreign_keys),
+    ("create persistent jobs table", _m003_create_jobs),
+    ("create document lifecycle table", _m004_create_documents),
+    ("add document content hash", _m005_add_document_hash),
 ]
 
 
@@ -150,21 +220,19 @@ def run_migrations() -> None:
         # 重建表期间必须关外键（否则 DROP TABLE 被引用检查拦住）；
         # PRAGMA foreign_keys 在事务内是 no-op，所以要在开事务前执行
         conn.execute("PRAGMA foreign_keys=OFF")
+
         current = conn.execute("PRAGMA user_version").fetchone()[0]
         latest = len(MIGRATIONS)
         if current > latest:
             raise RuntimeError(
-                f"数据库版本 {current} 超过代码已知最新版本 {latest}，"
-                "可能在跑旧代码，拒绝启动以免损坏数据"
+                f"数据库版本 {current} 超过代码已知最新版本 {latest}，可能在跑旧代码，拒绝启动以免损坏数据"
             )
         for number in range(current + 1, latest + 1):
             name, apply = MIGRATIONS[number - 1]
             with conn:  # 一个迁移一个事务：中途失败整体回滚，user_version 不前进
                 apply(conn)
                 conn.execute(f"PRAGMA user_version={number}")
-            logger.info(
-                "迁移完成", extra={"evt": "migration_applied", "version": number, "migration": name}
-            )
+            logger.info("迁移完成", extra={"evt": "migration_applied", "version": number, "migration": name})
         violations = conn.execute("PRAGMA foreign_key_check").fetchall()
         if violations:
             raise RuntimeError(f"迁移后外键校验失败：{violations[:5]}")
