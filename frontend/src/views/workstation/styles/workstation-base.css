@@ -23,6 +23,7 @@
   width: 100vw;
   height: 100vh;
   overflow: auto;
+  filter: grayscale(1);
   background: var(--body-bg);
   color: var(--text-primary);
   font-family:

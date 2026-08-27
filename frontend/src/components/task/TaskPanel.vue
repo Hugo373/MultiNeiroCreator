@@ -8,10 +8,17 @@
       <span v-if="taskStore.hasActiveTasks" class="task-live-dot" title="任务运行中"></span>
     </div>
 
-    <div v-if="taskStore.error" class="task-error">{{ taskStore.error }}</div>
-    <div v-else-if="!projectStore.id" class="task-empty">
-      进入一个服务端项目后，这里会显示文档状态。
-    </div>
+    <button
+      v-if="taskStore.error && !props.embedded"
+      type="button"
+      class="task-error-link"
+      @click="emit('open-settings')"
+    >
+      <span class="task-error-link-icon" aria-hidden="true">!</span>
+      <span>任务状态异常 · 在设置中查看</span>
+    </button>
+
+    <div v-if="!projectStore.id" class="task-empty">进入一个服务端项目后，这里会显示文档状态。</div>
     <div v-else-if="taskStore.isLoading && !taskStore.documents.length" class="task-empty">
       正在读取任务状态…
     </div>
@@ -33,7 +40,6 @@
         >
           <span :style="{ width: `${documentProgress(document)}%` }"></span>
         </div>
-        <div v-if="document.error" class="task-item-error">{{ document.error }}</div>
         <div class="task-item-meta">
           <span v-if="document.status === 'ready'">{{ document.chunks_count }} 个文本块</span>
           <span v-else-if="document.status === 'processing'">正在解析并向量化…</span>
@@ -68,15 +74,14 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted } from 'vue'
-import { storeToRefs } from 'pinia'
 import { useProjectStore } from '@/stores/project'
 import { useTaskStore } from '@/stores/tasks'
 import type { AgentDocument, DocumentStatus } from '@/serve/agent'
 
 const projectStore = useProjectStore()
 const taskStore = useTaskStore()
-const { id: projectId } = storeToRefs(projectStore)
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+const emit = defineEmits<{ (event: 'open-settings'): void }>()
 
 const labels: Record<DocumentStatus, string> = {
   queued: '排队中',
@@ -112,9 +117,6 @@ async function retry(jobId: string) {
     // 下一次轮询会保留后端返回的错误状态。
   }
 }
-
-onMounted(() => taskStore.startPolling(projectId))
-onBeforeUnmount(() => taskStore.stopPolling())
 </script>
 
 <style scoped>
@@ -158,6 +160,35 @@ onBeforeUnmount(() => taskStore.stopPolling())
   padding: 16px 2px 6px;
   line-height: 1.6;
 }
+.task-error-link {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px 9px;
+  border: 1px solid rgba(248, 113, 113, 0.2) !important;
+  border-radius: 7px;
+  background: rgba(127, 29, 29, 0.12) !important;
+  color: #fca5a5 !important;
+  font-size: 11px;
+  text-align: left;
+}
+.task-error-link:hover {
+  background: rgba(127, 29, 29, 0.2) !important;
+}
+.task-error-link-icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(248, 113, 113, 0.18);
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .task-error,
 .task-item-error {
   color: #fca5a5;

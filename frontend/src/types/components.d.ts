@@ -15,12 +15,16 @@ declare module 'vue' {
     AttachmentDock: typeof import('./../components/assistant/AttachmentDock.vue')['default']
     ChatComposer: typeof import('./../components/assistant/ChatComposer.vue')['default']
     CreateProjectDialog: typeof import('./../components/project/CreateProjectDialog.vue')['default']
+    CreativeToolPanel: typeof import('./../components/creative/CreativeToolPanel.vue')['default']
+    CreativeToolPicker: typeof import('./../components/creative/CreativeToolPicker.vue')['default']
     LoadingOverlay: typeof import('./../components/LoadingOverlay.vue')['default']
     MessageList: typeof import('./../components/assistant/MessageList.vue')['default']
     ParticleBackground: typeof import('./../components/ParticleBackground.vue')['default']
     ProjectSwitcher: typeof import('./../components/project/ProjectSwitcher.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SettingsPanel: typeof import('./../components/settings/SettingsPanel.vue')['default']
     TaskPanel: typeof import('./../components/task/TaskPanel.vue')['default']
+    WorkflowCanvas: typeof import('./../components/workflow/WorkflowCanvas.vue')['default']
   }
 }

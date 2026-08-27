@@ -45,10 +45,23 @@ export const useTaskStore = defineStore('tasks', () => {
       jobs.value = nextJobs
     } catch (cause) {
       if (token !== requestToken) return
-      error.value = cause instanceof Error ? cause.message : '任务状态加载失败'
+      error.value = formatTaskError(cause)
     } finally {
       if (token === requestToken) isLoading.value = false
     }
+  }
+
+  function formatTaskError(cause: unknown) {
+    if (!(cause instanceof Error)) return '任务状态加载失败'
+
+    const response = (
+      cause as Error & {
+        response?: { status?: number; data?: { detail?: unknown } }
+      }
+    ).response
+    const detail = response?.data?.detail
+    const message = typeof detail === 'string' ? detail : cause.message
+    return response?.status ? `请求失败（HTTP ${response.status}）：${message}` : message
   }
 
   function startPolling(projectId: Ref<number | null>) {

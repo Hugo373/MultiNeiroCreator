@@ -60,24 +60,56 @@
           </div>
         </header>
 
-        <main class="main-grid">
+        <main class="main-grid" :class="{ 'assistant-collapsed': isAssistantCollapsed }">
           <aside class="left-column">
             <div class="icon-rail" aria-label="Side navigation">
               <button class="icon-button active" title="Explorer" type="button">☰</button>
               <div class="rail-spacer"></div>
-              <button class="icon-button" title="Settings" type="button">⚙</button>
+              <button
+                class="icon-button"
+                :class="{ active: isSettingsOpen }"
+                title="Settings"
+                type="button"
+                :aria-expanded="isSettingsOpen"
+                aria-label="打开工作站设置"
+                @click="isSettingsOpen = !isSettingsOpen"
+              >
+                ⚙
+              </button>
             </div>
 
             <div class="sidebar-stack">
               <div class="sidebar-workspace">
-                <section class="section-card">
+                <section class="section-card creative-tool-section">
                   <div class="section-body">
+                    <TransitionGroup name="creative-tool-list" tag="div" class="creative-tool-list">
+                      <button
+                        v-for="tool in creativeToolsStore.instances"
+                        :key="tool.id"
+                        :data-tool-id="tool.id"
+                        class="creative-tool-block"
+                        :class="{ 'is-selected': tool.id === creativeToolsStore.selectedId }"
+                        type="button"
+                        @click="handleSelectTool(tool.id)"
+                      >
+                        <span
+                          class="creative-tool-block-mark"
+                          :style="{ color: tool.color }"
+                          aria-hidden="true"
+                          >{{ toolMark(tool.type) }}</span
+                        >
+                        <span class="creative-tool-block-copy">
+                          <span class="creative-tool-block-title">{{ tool.name }}</span>
+                          <span class="creative-tool-block-meta">{{ tool.badge }}</span>
+                        </span>
+                        <span class="creative-tool-block-arrow" aria-hidden="true">→</span>
+                      </button>
+                    </TransitionGroup>
                     <button class="add-tool-large" type="button" @click="isToolModalOpen = true">
                       添加创作工具 +
                     </button>
                   </div>
                 </section>
-                <TaskPanel />
               </div>
             </div>
           </aside>
@@ -85,56 +117,50 @@
           <section class="center-column">
             <div class="canvas-surface">
               <div class="canvas-area">
-                <div class="canvas-center">
-                  <div class="canvas-callout">创作区，等待加载工具。</div>
-                </div>
+                <WorkflowCanvas
+                  @open-picker="isToolModalOpen = true"
+                  @node-selected="handleWorkflowNodeSelected"
+                  @notify="handleWorkflowNotify"
+                />
+                <CreativeToolPanel @close="handleCreativePanelClose" />
               </div>
             </div>
           </section>
 
-          <aside class="right-column">
+          <aside class="right-column" :class="{ 'is-collapsed': isAssistantCollapsed }">
             <AssistantPanel ref="assistantPanelRef" />
+            <button
+              v-if="!isAssistantCollapsed"
+              type="button"
+              class="assistant-collapse-button"
+              aria-label="收起智能助手"
+              title="收起智能助手"
+              @click="isAssistantCollapsed = true"
+            >
+              →
+            </button>
+            <button
+              v-if="isAssistantCollapsed"
+              type="button"
+              class="assistant-reveal-button"
+              aria-label="展开智能助手"
+              title="展开智能助手"
+              @click="isAssistantCollapsed = false"
+            >
+              ✦
+            </button>
           </aside>
         </main>
       </div>
     </div>
 
-    <Transition name="modal-fade">
-      <div
-        v-if="isToolModalOpen"
-        class="modal-overlay"
-        :aria-hidden="!isToolModalOpen"
-        @click.self="isToolModalOpen = false"
-      >
-        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-          <div class="modal-head">
-            <div>
-              <div id="modalTitle" class="modal-title">添加工具</div>
-              <div class="modal-caption">为当前项目追加新的创作模块或 Agent 插件。</div>
-            </div>
-            <button
-              class="modal-close"
-              type="button"
-              aria-label="Close"
-              @click="isToolModalOpen = false"
-            >
-              ✕
-            </button>
-          </div>
-          <div class="modal-body">
-            <button
-              v-for="item in toolModalOptions"
-              :key="item.title"
-              class="modal-option"
-              type="button"
-            >
-              <div class="message-title">{{ item.title }}</div>
-              <div class="modal-option-sub">{{ item.description }}</div>
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
+    <CreativeToolPicker
+      :open="isToolModalOpen"
+      @close="isToolModalOpen = false"
+      @added="handleToolAdded"
+    />
+
+    <SettingsPanel :open="isSettingsOpen" @close="isSettingsOpen = false" />
 
     <CreateProjectDialog
       :open="isCreateProjectModalOpen"
@@ -189,7 +215,8 @@
 // 入口初始化（路由项目 id -> 服务端详情 -> store）、项目打开/新建/切换导航、
 // 保存模式切换、登出。项目/会话状态在 Pinia（stores/project.ts、stores/chat.ts），
 // 具体交互在 components/project/*、components/assistant/* 与 composables/*。
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from '@/utils/toast'
 import { getProject } from '@/serve/project'
@@ -197,6 +224,9 @@ import { useLoadingStore } from '@/stores/loading'
 import { useUserStore } from '@/stores/user'
 import { normalizeSaveMode, useProjectStore, type RecentProjectItem } from '@/stores/project'
 import { useChatStore } from '@/stores/chat'
+import { useCreativeToolsStore } from '@/stores/creativeTools'
+import { useTaskStore } from '@/stores/tasks'
+import { useWorkflowStore } from '@/stores/workflow'
 import {
   saveModeLabels,
   saveModeOptions,
@@ -212,21 +242,22 @@ import {
 import ProjectSwitcher from '@/components/project/ProjectSwitcher.vue'
 import CreateProjectDialog from '@/components/project/CreateProjectDialog.vue'
 import AssistantPanel from '@/components/assistant/AssistantPanel.vue'
-import TaskPanel from '@/components/task/TaskPanel.vue'
+import CreativeToolPicker from '@/components/creative/CreativeToolPicker.vue'
+import CreativeToolPanel from '@/components/creative/CreativeToolPanel.vue'
+import WorkflowCanvas from '@/components/workflow/WorkflowCanvas.vue'
+import SettingsPanel from '@/components/settings/SettingsPanel.vue'
 import '@/views/workstation/styles/workstation-base.css'
 
-interface ToolModalOption {
-  title: string
-  description: string
-}
-
-// 真实进度接管：让工作站初始化阶段能推动 loadingStore.setProgress()，
+// 真实进度接管：让工作站初始化阶段能推动 loadingStore.setProgress(),
 // 覆盖层在 realProgress > 0 时无缝从内置 rAF 切到真实进度。
 const loadingStore = useLoadingStore()
 const route = useRoute()
 const router = useRouter()
 const projectStore = useProjectStore()
 const chatStore = useChatStore()
+const creativeToolsStore = useCreativeToolsStore()
+const taskStore = useTaskStore()
+const workflowStore = useWorkflowStore()
 const autoSave = useAutoSave()
 
 // emit:ready —— 核心资源初始化完成时通知外层淡出覆盖层。
@@ -235,29 +266,17 @@ const emit = defineEmits<{ (e: 'ready'): void }>()
 
 const assistantPanelRef = ref<InstanceType<typeof AssistantPanel> | null>(null)
 const saveModeWrapRef = ref<HTMLElement | null>(null)
+const { id: projectId } = storeToRefs(projectStore)
 
 const isToolModalOpen = ref(false)
+const isSettingsOpen = ref(false)
+const isAssistantCollapsed = ref(false)
 const isSaveModeOpen = ref(false)
 const isSaveModeApplying = ref(false)
 const isCreateProjectModalOpen = ref(false)
 const isProjectWarningOpen = ref(false)
 const projectWarningTitle = ref('')
 const projectWarningMessage = ref('')
-
-const toolModalOptions: ToolModalOption[] = [
-  {
-    title: 'Plugin Module',
-    description: '挂载新的创作能力，例如编曲、混音、PV 或 Live2D Agent。',
-  },
-  {
-    title: 'Import Workflow',
-    description: '导入已有工作流模板，把当前项目接入新的流水线。',
-  },
-  {
-    title: 'Create Sandbox',
-    description: '建立独立实验区，用于测试新模型、新参数和新模块。',
-  },
-]
 
 const currentSaveModeLabel = computed(() => saveModeLabels[projectStore.saveMode])
 
@@ -453,6 +472,36 @@ async function handleSelectSaveMode(option: SaveModeOption) {
   }
 }
 
+/* ---------- 创作工具 Block ---------- */
+
+function toolMark(type: string) {
+  return { lyrics: 'Aa', image: '✦', video: '▶', audio: '∿' }[type] ?? '✦'
+}
+
+function handleToolAdded(id: string) {
+  const tool = creativeToolsStore.instances.find((item) => item.id === id)
+  if (tool) workflowStore.addNode(tool)
+}
+
+function handleSelectTool(id: string) {
+  creativeToolsStore.selectTool(id, true)
+  workflowStore.selectNode(`workflow-node-${id}`)
+}
+
+function handleWorkflowNodeSelected(toolId: string) {
+  creativeToolsStore.selectTool(toolId, false)
+  const toolElement = document.querySelector<HTMLElement>(`[data-tool-id="${toolId}"]`)
+  toolElement?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+}
+
+function handleCreativePanelClose() {
+  creativeToolsStore.closePanel()
+}
+
+function handleWorkflowNotify(message: string) {
+  ElMessage.success(message)
+}
+
 function handleLogout() {
   useUserStore().logout()
   ElMessage.success('已退出登录')
@@ -466,12 +515,22 @@ function handleDocumentClick(event: MouseEvent) {
   }
 }
 
+function loadCreativeWorkspace(projectId: number | null) {
+  creativeToolsStore.loadForProject(projectId)
+  workflowStore.loadForProject(projectId)
+  workflowStore.syncWithTools(creativeToolsStore.instances)
+}
+
+watch(projectId, loadCreativeWorkspace, { immediate: true })
+
 onMounted(() => {
+  taskStore.startPolling(projectId)
   document.addEventListener('click', handleDocumentClick)
   void initializeWorkspaceFromEntryPoint()
 })
 
 onBeforeUnmount(() => {
+  taskStore.stopPolling()
   document.removeEventListener('click', handleDocumentClick)
 })
 </script>
@@ -646,6 +705,10 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
+.main-grid.assistant-collapsed {
+  grid-template-columns: var(--left-column-w) minmax(716px, 1fr) 44px;
+}
+
 .left-column {
   grid-area: left;
   min-width: 0;
@@ -734,6 +797,110 @@ onBeforeUnmount(() => {
   filter: none !important;
 }
 
+.creative-tool-section {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.creative-tool-section .section-body {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.creative-tool-list {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+}
+
+.creative-tool-block {
+  display: flex;
+  width: 100%;
+  min-height: 76px;
+  flex: 0 0 76px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 13px;
+  border: 1px solid rgba(40, 40, 40, 0.6) !important;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.02) !important;
+  color: var(--text-secondary) !important;
+  text-align: left;
+}
+
+.creative-tool-block:hover,
+.creative-tool-block.is-selected {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--text-primary) !important;
+}
+
+.creative-tool-block.is-selected {
+  border-color: rgba(210, 210, 210, 0.48) !important;
+}
+
+.creative-tool-block-mark {
+  display: grid;
+  width: 29px;
+  height: 29px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 7px;
+  filter: grayscale(1);
+  font-size: 15px;
+}
+
+.creative-tool-block-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.creative-tool-block-title {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.creative-tool-block-meta {
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.creative-tool-block-arrow {
+  flex: 0 0 auto;
+  color: #777;
+  font-size: 14px;
+}
+
+.creative-tool-list-enter-active,
+.creative-tool-list-leave-active,
+.creative-tool-list-move {
+  transition:
+    transform 300ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 240ms ease;
+}
+
+.creative-tool-list-enter-from,
+.creative-tool-list-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.creative-tool-list-leave-active {
+  position: absolute;
+  width: 100%;
+}
+
 .center-column {
   grid-area: center;
   min-width: 0;
@@ -747,13 +914,16 @@ onBeforeUnmount(() => {
   inset: 0;
   display: flex;
   flex-direction: column;
-  padding: 6px;
-  gap: 10px;
+  padding: 0;
+  gap: 0;
 }
 
 .canvas-area {
+  position: relative;
   flex: 1;
+  min-height: 0;
   display: flex;
+  overflow: hidden;
 }
 
 .canvas-center {
@@ -791,6 +961,64 @@ onBeforeUnmount(() => {
     linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)), var(--column-bg);
   position: relative;
   overflow: hidden;
+}
+
+.right-column > .assistant-panel {
+  transition:
+    transform 340ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 260ms ease;
+}
+
+.assistant-collapse-button {
+  position: absolute;
+  top: 13px;
+  right: 12px;
+  z-index: 6;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035) !important;
+  color: #9297a1 !important;
+  font-size: 16px;
+}
+
+.assistant-collapse-button:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+}
+
+.right-column.is-collapsed {
+  overflow: visible;
+  background: var(--column-bg);
+}
+
+.right-column.is-collapsed > .assistant-panel {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(calc(100% + 20px));
+}
+
+.assistant-reveal-button {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  display: grid;
+  width: 32px;
+  height: 72px;
+  place-items: center;
+  transform: translateY(-50%);
+  border: 1px solid rgba(96, 165, 250, 0.45) !important;
+  border-radius: 8px 0 0 8px;
+  background: rgba(255, 255, 255, 0.07) !important;
+  color: #d3d3d3 !important;
+  font-size: 16px;
+}
+
+.assistant-reveal-button:hover {
+  background: #3b82f6 !important;
 }
 
 @media (max-width: 1180px) {
