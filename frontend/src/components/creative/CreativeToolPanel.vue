@@ -37,6 +37,87 @@
             <span>{{ tool.inputHint }} · 当前为预输入配置</span>
           </div>
 
+          <div class="creative-input-section">
+            <div class="creative-input-section-head">
+              <span>主要输入</span>
+              <small>来自输入节点或上一步结果</small>
+            </div>
+            <div class="creative-main-input-card">
+              <span class="creative-input-port-mark">⇥</span>
+              <div>
+                <strong>{{ mainInputLabel }}</strong>
+                <small>{{ mainInputDetail }} · {{ mainInputHint(tool.type) }}</small>
+              </div>
+              <span class="creative-input-status">预输入</span>
+            </div>
+          </div>
+
+          <div class="creative-input-section">
+            <div class="creative-input-section-head">
+              <span>补充参考</span>
+              <small>可添加图片或文本，不替换主要输入</small>
+            </div>
+            <div v-if="references.length" class="creative-reference-list">
+              <div
+                v-for="reference in references"
+                :key="reference.id"
+                class="creative-reference-item"
+              >
+                <span class="creative-reference-type">{{
+                  reference.type === 'image' ? '▧' : 'Aa'
+                }}</span>
+                <span class="creative-reference-copy">
+                  <strong>{{ reference.name }}</strong>
+                  <small>{{ reference.detail ?? '用户补充参考' }}</small>
+                </span>
+                <button
+                  type="button"
+                  class="creative-reference-remove"
+                  :aria-label="`移除${reference.name}`"
+                  @click="removeReference(reference.id)"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div v-else class="creative-reference-empty">
+              还没有补充参考，生成时可只使用主要输入。
+            </div>
+            <div class="creative-reference-actions">
+              <label class="creative-reference-add">
+                <span>＋ 图片 / 文件</span>
+                <input
+                  type="file"
+                  accept="image/*,.txt,.md,.pdf,.wav,.mp3"
+                  @change="handleFileChange"
+                />
+              </label>
+              <button
+                type="button"
+                class="creative-reference-add"
+                @click="textReferenceOpen = !textReferenceOpen"
+              >
+                ＋ 文本参考
+              </button>
+            </div>
+            <div v-if="textReferenceOpen" class="creative-text-reference-form">
+              <textarea
+                v-model="textReference"
+                rows="2"
+                placeholder="输入风格、限制或画面补充说明"
+              ></textarea>
+              <button type="button" @click="addTextReference">添加</button>
+            </div>
+          </div>
+
+          <div class="creative-output-preview">
+            <span class="creative-output-port-mark">⇥</span>
+            <div>
+              <strong>输出接口</strong>
+              <small>预期生成多版结果，用户选择后再进入下一节点</small>
+            </div>
+          </div>
+
           <template v-if="tool.type === 'lyrics'">
             <label class="creative-field">
               <span>创作主题</span>
@@ -192,11 +273,29 @@
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { ElMessage } from '@/utils/toast'
 import { useCreativeToolsStore } from '@/stores/creativeTools'
+import { useWorkflowStore, WORKFLOW_INPUT_ID } from '@/stores/workflow'
 
 const emit = defineEmits<{ (event: 'close'): void }>()
 const creativeToolsStore = useCreativeToolsStore()
+const workflowStore = useWorkflowStore()
 const tool = computed(() => creativeToolsStore.activePanelTool)
+const references = computed(() => tool.value?.references ?? [])
+const mainInputSource = computed(() => {
+  const nodeId = tool.value ? `workflow-node-${tool.value.id}` : null
+  const edge = workflowStore.edges.find((item) => item.target === nodeId)
+  if (!edge) return null
+  if (edge.source === WORKFLOW_INPUT_ID) return '输入节点'
+  return workflowStore.nodes.find((node) => node.id === edge.source)?.name ?? '上一步工具'
+})
+const mainInputLabel = computed(() => mainInputSource.value ?? '等待连接')
+const mainInputDetail = computed(() =>
+  mainInputSource.value
+    ? '连接建立后，将接收上一步选中的单个生产结果'
+    : '请从输入节点或上一步工具的输出插孔建立连接',
+)
 const panelRef = ref<HTMLElement | null>(null)
+const textReferenceOpen = ref(false)
+const textReference = ref('')
 
 function update(key: string, event: Event) {
   const target = event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
@@ -207,9 +306,51 @@ function updateValue(key: string, value: string) {
   if (tool.value) creativeToolsStore.updateParam(tool.value.id, key, value)
 }
 
+function mainInputHint(type: string) {
+  return (
+    {
+      lyrics: '输入节点的主题文字或项目资料',
+      image: '上一工具的 Prompt / 歌词或图片结果',
+      video: '上一工具的图片、分镜或音频结果',
+      audio: '输入节点的音频或上一工具的声音结果',
+    }[type] ?? '上一工具的生产结果'
+  )
+}
+
+function handleFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file || !tool.value) return
+  const type = file.type.startsWith('image/') ? 'image' : 'file'
+  creativeToolsStore.addReference(tool.value.id, {
+    type,
+    name: file.name,
+    detail: `${Math.ceil(file.size / 1024)} KB · 预输入本地引用`,
+  })
+  input.value = ''
+}
+
+function addTextReference() {
+  const value = textReference.value.trim()
+  if (!value || !tool.value) return
+  creativeToolsStore.addReference(tool.value.id, {
+    type: 'text',
+    name: value.length > 24 ? `${value.slice(0, 24)}…` : value,
+    detail: '用户输入的文本参考',
+  })
+  textReference.value = ''
+  textReferenceOpen.value = false
+}
+
+function removeReference(referenceId: string) {
+  if (tool.value) creativeToolsStore.removeReference(tool.value.id, referenceId)
+}
+
 function saveAndClose() {
   if (!tool.value) return
   creativeToolsStore.saveTool(tool.value.id)
+  textReferenceOpen.value = false
+  textReference.value = ''
   creativeToolsStore.closePanel()
   emit('close')
   ElMessage.success('参数已保存')
@@ -248,9 +389,8 @@ function artMark(type: string) {
 .creative-tool-config {
   position: absolute;
   top: 0;
-  left: 76px;
-  display: flex;
-  width: min(calc(var(--left-column-w) - 42px), calc(100% - 76px));
+  left: 18px;
+  width: min(430px, calc(100% - 36px));
   height: 100%;
   min-height: 0;
   flex-direction: column;
@@ -341,6 +481,215 @@ function artMark(type: string) {
   background: rgba(255, 255, 255, 0.055);
   color: #c4c4c4;
   font-size: 10px;
+}
+
+.creative-input-section {
+  margin-bottom: 15px;
+  padding: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.creative-input-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 9px;
+  color: #c8c8c8;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.creative-input-section-head small,
+.creative-main-input-card small,
+.creative-output-preview small,
+.creative-reference-copy small {
+  color: #777b84;
+  font-size: 9px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.creative-main-input-card,
+.creative-output-preview {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 45px;
+  padding: 8px 9px;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  border-radius: 7px;
+  background: rgba(96, 165, 250, 0.07);
+}
+
+.creative-main-input-card > div,
+.creative-output-preview > div {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.creative-main-input-card strong,
+.creative-output-preview strong {
+  color: #d7e9ff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.creative-input-port-mark,
+.creative-output-port-mark {
+  color: #72b5ff;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.creative-input-status {
+  padding: 3px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #aeb9c8;
+  font-size: 8px;
+}
+
+.creative-reference-list {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.creative-reference-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 7px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.creative-reference-type {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #d0d7e0;
+  font-size: 10px;
+}
+
+.creative-reference-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.creative-reference-copy strong {
+  overflow: hidden;
+  color: #cfd2d8;
+  font-size: 10px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.creative-reference-remove {
+  width: 21px;
+  height: 21px;
+  flex: 0 0 auto;
+  border-radius: 4px;
+  color: #888d97 !important;
+  font-size: 15px;
+}
+
+.creative-reference-remove:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #fff !important;
+}
+
+.creative-reference-empty {
+  margin-bottom: 8px;
+  color: #777b84;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.creative-reference-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.creative-reference-add {
+  display: inline-flex;
+  align-items: center;
+  min-height: 27px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #aeb2ba;
+  cursor: pointer;
+  font-size: 9px;
+}
+
+.creative-reference-add:hover {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f0f0f0;
+}
+
+.creative-reference-add input {
+  display: none;
+}
+
+.creative-text-reference-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.creative-text-reference-form textarea {
+  min-width: 0;
+  flex: 1;
+  padding: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 5px;
+  outline: 0;
+  resize: vertical;
+  background: rgba(255, 255, 255, 0.035);
+  color: #dedede;
+  font-size: 10px;
+}
+
+.creative-text-reference-form button {
+  min-height: 29px;
+  padding: 0 8px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #d9d9d9 !important;
+  font-size: 9px;
+}
+
+.creative-output-preview {
+  margin-bottom: 15px;
+  border-color: rgba(167, 139, 250, 0.3);
+  background: rgba(167, 139, 250, 0.07);
+}
+
+.creative-output-preview strong {
+  color: #e2d9ff;
+}
+
+.creative-output-port-mark {
+  color: #b8a2ff;
 }
 
 .creative-field-grid {

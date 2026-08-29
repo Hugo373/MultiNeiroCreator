@@ -13,6 +13,13 @@ export interface CreativeToolCatalogItem {
   defaults: Record<string, string>
 }
 
+export interface CreativeToolReference {
+  id: string
+  type: 'image' | 'text' | 'file'
+  name: string
+  detail?: string
+}
+
 export interface CreativeToolInstance {
   id: string
   type: CreativeToolType
@@ -22,6 +29,7 @@ export interface CreativeToolInstance {
   color: string
   inputHint: string
   params: Record<string, string>
+  references: CreativeToolReference[]
   updatedAt: string
 }
 
@@ -129,7 +137,12 @@ export const useCreativeToolsStore = defineStore('creativeTools', () => {
         instances?: CreativeToolInstance[]
         selectedId?: string | null
       }
-      instances.value = Array.isArray(parsed.instances) ? parsed.instances : []
+      instances.value = Array.isArray(parsed.instances)
+        ? parsed.instances.map((instance) => ({
+            ...instance,
+            references: instance.references ?? [],
+          }))
+        : []
       selectedId.value = parsed.selectedId ?? null
       activePanelId.value = null
     } catch {
@@ -150,6 +163,7 @@ export const useCreativeToolsStore = defineStore('creativeTools', () => {
       color: item.color,
       inputHint: item.inputHint,
       params: { ...item.defaults },
+      references: [],
       updatedAt: new Date().toISOString(),
     }
     instances.value.push(instance)
@@ -181,6 +195,34 @@ export const useCreativeToolsStore = defineStore('creativeTools', () => {
     persist()
   }
 
+  function addReference(id: string, reference: Omit<CreativeToolReference, 'id'>) {
+    const tool = instances.value.find((item) => item.id === id)
+    if (!tool) return
+    tool.references.push({
+      id: `${id}-reference-${Date.now()}-${tool.references.length}`,
+      ...reference,
+    })
+    tool.updatedAt = new Date().toISOString()
+    persist()
+  }
+
+  function removeReference(id: string, referenceId: string) {
+    const tool = instances.value.find((item) => item.id === id)
+    if (!tool) return
+    tool.references = tool.references.filter((reference) => reference.id !== referenceId)
+    tool.updatedAt = new Date().toISOString()
+    persist()
+  }
+
+  function removeTool(id: string) {
+    const index = instances.value.findIndex((tool) => tool.id === id)
+    if (index < 0) return
+    instances.value.splice(index, 1)
+    if (selectedId.value === id) selectedId.value = instances.value[index]?.id ?? null
+    if (activePanelId.value === id) activePanelId.value = null
+    persist()
+  }
+
   function closePanel() {
     activePanelId.value = null
     persist()
@@ -200,6 +242,9 @@ export const useCreativeToolsStore = defineStore('creativeTools', () => {
     selectTool,
     updateParam,
     saveTool,
+    addReference,
+    removeReference,
+    removeTool,
     closePanel,
   }
 })

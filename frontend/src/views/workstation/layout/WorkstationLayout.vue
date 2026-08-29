@@ -83,14 +83,17 @@
                 <section class="section-card creative-tool-section">
                   <div class="section-body">
                     <TransitionGroup name="creative-tool-list" tag="div" class="creative-tool-list">
-                      <button
+                      <div
                         v-for="tool in creativeToolsStore.instances"
                         :key="tool.id"
                         :data-tool-id="tool.id"
                         class="creative-tool-block"
                         :class="{ 'is-selected': tool.id === creativeToolsStore.selectedId }"
-                        type="button"
+                        role="button"
+                        tabindex="0"
                         @click="handleSelectTool(tool.id)"
+                        @keydown.enter="handleSelectTool(tool.id)"
+                        @keydown.space.prevent="handleSelectTool(tool.id)"
                       >
                         <span
                           class="creative-tool-block-mark"
@@ -102,8 +105,17 @@
                           <span class="creative-tool-block-title">{{ tool.name }}</span>
                           <span class="creative-tool-block-meta">{{ tool.badge }}</span>
                         </span>
+                        <button
+                          type="button"
+                          class="creative-tool-block-remove"
+                          :aria-label="`移除${tool.name}`"
+                          title="从当前工作流移除"
+                          @click.stop="handleRemoveTool(tool.id)"
+                        >
+                          ×
+                        </button>
                         <span class="creative-tool-block-arrow" aria-hidden="true">→</span>
-                      </button>
+                      </div>
                     </TransitionGroup>
                     <button class="add-tool-large" type="button" @click="isToolModalOpen = true">
                       添加创作工具 +
@@ -147,7 +159,7 @@
               title="展开智能助手"
               @click="isAssistantCollapsed = false"
             >
-              ✦
+              ←
             </button>
           </aside>
         </main>
@@ -486,6 +498,14 @@ function handleToolAdded(id: string) {
 function handleSelectTool(id: string) {
   creativeToolsStore.selectTool(id, true)
   workflowStore.selectNode(`workflow-node-${id}`)
+}
+
+function handleRemoveTool(id: string) {
+  const tool = creativeToolsStore.instances.find((item) => item.id === id)
+  if (!tool) return
+  workflowStore.removeNodeByToolId(id)
+  creativeToolsStore.removeTool(id)
+  ElMessage.success(`已移除工具：${tool.name}，相关连接已断开`)
 }
 
 function handleWorkflowNodeSelected(toolId: string) {
@@ -832,6 +852,8 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.02) !important;
   color: var(--text-secondary) !important;
   text-align: left;
+  cursor: pointer;
+  user-select: none;
 }
 
 .creative-tool-block:hover,
@@ -880,6 +902,33 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   color: #777;
   font-size: 14px;
+}
+
+.creative-tool-block-remove {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 5px;
+  color: #727680 !important;
+  font-size: 16px;
+  opacity: 0;
+  transition:
+    opacity 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.creative-tool-block:hover .creative-tool-block-remove,
+.creative-tool-block:focus-within .creative-tool-block-remove,
+.creative-tool-block.is-selected .creative-tool-block-remove {
+  opacity: 1;
+}
+
+.creative-tool-block-remove:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
 }
 
 .creative-tool-list-enter-active,
