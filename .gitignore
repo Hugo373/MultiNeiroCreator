@@ -1,6 +1,8 @@
 # ===== 仓库边界：只提交前后端源码目录和本文件 =====
 /*
 !/.gitignore
+!/README.md
+!/.github/
 !/backend/
 !/frontend/
 

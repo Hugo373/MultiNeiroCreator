@@ -7,8 +7,28 @@ DEFAULT_COLLECTION_NAME = RAG_COLLECTION_NAME
 
 class VectorStore:
     def __init__(self, collection_name: str = DEFAULT_COLLECTION_NAME):
-        self.client_db = chromadb.PersistentClient(path=str(BACKEND_DIR / "chroma_db"))
-        self.collection = self._get_or_create_collection(collection_name)
+        self.collection_name = collection_name
+        self._client_db: chromadb.api.ClientAPI | None = None
+        self._collection = None
+
+    @property
+    def client_db(self):
+        # 惰性初始化：首次真正使用时才连接 chroma，import 本模块不再有副作用，
+        # 也避免并发进程同时 import 时在 create_collection 上撞“already exists”
+        if self._client_db is None:
+            self._client_db = chromadb.PersistentClient(path=str(BACKEND_DIR / "chroma_db"))
+        return self._client_db
+
+    @property
+    def collection(self):
+        if self._collection is None:
+            self._collection = self._get_or_create_collection(self.collection_name)
+        return self._collection
+
+    def reset(self) -> None:
+        """丢弃已建立的连接与 collection 引用（测试隔离用）。"""
+        self._client_db = None
+        self._collection = None
 
     def _get_or_create_collection(self, name: str):
         try:
