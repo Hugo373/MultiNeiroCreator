@@ -16,6 +16,7 @@ import json
 import logging
 import time
 from collections.abc import AsyncGenerator
+from typing import Any
 
 from fastapi import HTTPException
 from starlette.concurrency import iterate_in_threadpool
@@ -266,7 +267,8 @@ async def _orchestrate(
         project_id,
         ctx.attachments,
     )
-    assistant_history_item = {"role": "assistant", "content": reply}
+    # 历史条目允许 citations 附加字段，值类型标注 Any 避免 mypy 把 dict 收窄成 str->str
+    assistant_history_item: dict[str, Any] = {"role": "assistant", "content": reply}
     if ctx.citations:
         assistant_history_item["citations"] = ctx.citations
     clean_history.append(assistant_history_item)

@@ -4,6 +4,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
+from typing import Any, cast
 
 from agents.neyria import build_system_prompt
 from core import config
@@ -187,17 +188,26 @@ async def build_chat_context(
     """并行构建附件上下文和普通 RAG 上下文，单个分支失败不连坐。"""
     rag_started = time.perf_counter()
     try:
-        attachment_result, retrieved_result = await asyncio.gather(
-            asyncio.to_thread(build_attachment_context, user_id, project_id, attachments),
-            asyncio.to_thread(build_retrieved_context, user_id, message, project_id),
-            return_exceptions=True,
+        # gather(return_exceptions=True) 返回 (结果 | BaseException, ...)，
+        # mypy 对 to_thread 包装的推断不完整（has-type），显式 cast 成两元组
+        attachment_result, retrieved_result = cast(
+            "tuple[Any, Any]",
+            await asyncio.gather(
+                asyncio.to_thread(build_attachment_context, user_id, project_id, attachments),
+                asyncio.to_thread(build_retrieved_context, user_id, message, project_id),
+                return_exceptions=True,
+            ),
         )
-        attachment_context, attachment_citations = (
+        # asyncio.gather(return_exceptions=True) 的返回是 BaseException | 结果 的联合，
+        # mypy 无法跨 isinstance 收窄 to_thread 包装的类型，这里显式标注元组形状
+        attachment_pair: tuple[str, list[dict]] = (
             attachment_result if isinstance(attachment_result, tuple) else ("", [])
         )
-        retrieved_context, retrieved_citations = (
+        retrieved_pair: tuple[str, list[dict]] = (
             retrieved_result if isinstance(retrieved_result, tuple) else ("", [])
         )
+        attachment_context, attachment_citations = attachment_pair
+        retrieved_context, retrieved_citations = retrieved_pair
         for label, result in (("attachment", attachment_result), ("retrieval", retrieved_result)):
             if isinstance(result, Exception):
                 logger.warning(
